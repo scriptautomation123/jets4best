@@ -1,0 +1,127 @@
+# Maven target directories
+target/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+scripts
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Compiled class files
+*.class
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# Virtual machine crash logs
+hs_err_pid*
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar 
+
+# Ignore all target folders
+**/target/
+*.md
+*cursor*
+!README.md
+!docs/pom/maven-pom-guide.md
+# Ignore all .pmd files
+**/*.pmd
+.prompts
+.vscode/
+.devcontainer/
+.specstory/
+.docs/
+.sonarlint
+.cursor/
+.devcontainer/
+.serena/
+.specstory
+config-manager/pmd.xml
+exception/pmd.xml
+pmd.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+.specstory/history/2025-06-30_12-42Z-untitled.md
+.specstory/.project.json
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/spotbugs-exclude.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/spotbugs-exclude.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/checkstyle/checkstyle-aieutil.xml
+todo/code-quality-rules/checkstyle/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-parent-inheritance.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-strategy1-validation.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/checkstyle.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/enforce-dep-manage.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppressions.xml
+todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/spotbugs-exclude.xml
+src/main/java/com/baml/mav/aieutil/aieutil.code-workspace
+src/main/java/com/baml/mav/aieutil/utility-usage-validation.md

@@ -1,0 +1,60 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>bundle</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>true</includeBaseDirectory>
+    <baseDirectory>${project.artifactId}-${project.version}</baseDirectory>
+
+    <fileSets>
+        <!-- 1. Copy the custom JRE created by jlink -->
+        <fileSet>
+            <directory>${project.build.directory}/jre</directory>
+            <outputDirectory>jre</outputDirectory>
+        </fileSet>
+
+        <!-- 2. Copy the shaded JAR (with-dependencies) at the top level -->
+        <fileSet>
+            <directory>${project.build.directory}</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>${project.artifactId}-${project.version}-with-dependencies.jar</include>
+            </includes>
+        </fileSet>
+
+        <!-- 3. Copy run scripts and make run.sh executable -->
+        <fileSet>
+            <directory>${project.basedir}/src/main/assembly</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>run.sh</include>
+                <include>run.bat</include>
+            </includes>
+            <fileMode>0755</fileMode>
+        </fileSet>
+
+        <!-- 4. Copy resource files (config, sql, etc.) -->
+        <fileSet>
+            <directory>../src/main/resources</directory>
+            <outputDirectory>resources</outputDirectory>
+            <includes>
+                <include>application.yaml</include>
+                <include>vaults.yaml</include>
+                <include>log4j2.xml</include>
+            </includes>
+        </fileSet>
+        
+
+    </fileSets>
+
+    <dependencySets>
+        <!-- 6. Copy the main application JAR -->
+        <dependencySet>
+            <outputDirectory>app</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <scope>runtime</scope>
+        </dependencySet>
+    </dependencySets>
+</assembly>

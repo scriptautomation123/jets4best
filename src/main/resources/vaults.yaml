@@ -1,0 +1,3 @@
+vault:
+  token: "mysecrettokenvalue"
+  path: "/secret/data/myapp"
