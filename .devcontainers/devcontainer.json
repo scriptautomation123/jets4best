@@ -1,0 +1,53 @@
+{
+  "name": "Oracle + Vault Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y jq && ./.devcontainer/start-containers.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.java",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-maven",
+        "ms-azuretools.vscode-docker",
+        "michelemelluso.gitignore",
+        "rhalaly.scope-to-this",
+        "redhat.vscode-xml"
+      ]
+    }
+  },
+  "forwardPorts": [
+    1521,
+    5500,
+    8200
+  ],
+  "portsAttributes": {
+    "1521": {
+      "label": "Oracle Database",
+      "onAutoForward": "notify"
+    },
+    "5500": {
+      "label": "Oracle Enterprise Manager",
+      "onAutoForward": "notify"
+    },
+    "8200": {
+      "label": "Vault",
+      "onAutoForward": "notify"
+    }
+  },
+  "containerEnv": {
+    "ORACLE_PWD": "${{ secrets.ORACLE_PWD }}",
+    "ORACLE_CHARACTERSET": "AL32UTF8",
+    "VAULT_DEV_ROOT_TOKEN_ID": "${{ secrets.VAULT_DEV_ROOT_TOKEN_ID }}"
+  },
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "64gb"
+  }
+}
