@@ -125,3 +125,4 @@ todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/owasp-suppress
 todo/code-quality-rules/pom-manage/strategy-01-parent-inheritance/spotbugs-exclude.xml
 src/main/java/com/baml/mav/aieutil/aieutil.code-workspace
 src/main/java/com/baml/mav/aieutil/utility-usage-validation.md
+.devcontainer/.env

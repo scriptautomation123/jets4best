@@ -17,6 +17,7 @@
         <shade.plugin.version>3.6.0</shade.plugin.version>
         <exec.plugin.version>3.5.1</exec.plugin.version>
         <assembly.plugin.version>3.7.1</assembly.plugin.version>
+        <picocli.version>4.7.1</picocli.version>
     </properties>
 
     <!-- Centralized dependency versions -->
@@ -56,6 +57,12 @@
                 <artifactId>h2</artifactId>
                 <version>${h2.version}</version>
             </dependency>
+            <!-- Picocli -->
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>${picocli.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -85,11 +92,13 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
         </dependency>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+        </dependency>
     </dependencies>
 
-    
-    
-    
+
     <!-- Centralized plugin versions -->
     <build>
         <pluginManagement>
@@ -131,13 +140,13 @@
             </plugin>
 
 
-
-            <!-- PRODUCUES A DEPENDNECY REDUCED JAR -->
+            <!-- 1. Shade Plugin: Builds Uberjar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <executions>
                     <execution>
+                        <id>shade-uberjar</id>
                         <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
@@ -167,44 +176,37 @@
                                     <mainClass>com.baml.mav.aieutil.AieUtilCli</mainClass>
                                 </transformer>
                             </transformers>
+
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- produces a dependency reduced base on the app --> 
+            <!-- 2. fat jar + custom jre to a zip file-->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
+                <version>${exec.plugin.version}</version>
                 <executions>
                     <execution>
-                        <id>run-jlink</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
+                        <id>run-jlink-helper</id>
                         <phase>package</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
                         <configuration>
-                            <executable>jlink</executable>
+                            <mainClass>com.baml.mav.aieutil.buildhelpers.JlinkHelper</mainClass>
                             <arguments>
-                                <argument>--module-path</argument>
-                                <argument>${java.home}/jmods/target/dependency</argument>
-                                <argument>--add-modules</argument>
                                 <argument>
-                                    java.base,java.sql,java.naming,java.logging,java.management,jdk.unsupported</argument>
-                                <argument>--output</argument>
+                                    ${project.build.directory}/${project.build.finalName}.jar</argument>
+                                <argument>${env.JAVA_HOME}/jmods</argument>
                                 <argument>${project.build.directory}/jre</argument>
-                                <argument>--strip-debug</argument>
-                                <argument>--no-man-pages</argument>
-                                <argument>--no-header-files</argument>
-                                <argument>--compress</argument>
-                                <argument>zip-2</argument>
                             </arguments>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- jar + jre + log4j + proeprty files creates a zip -->
+            <!-- 3. use jdeps and jlink to generate a custom jre-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -219,8 +221,8 @@
                             <descriptors>
                                 <descriptor>src/main/assembly/bundle.xml</descriptor>
                             </descriptors>
-                            <finalName>${project.artifactId}-${project.version}</finalName>
-                            <appendAssemblyId>true</appendAssemblyId>
+                            <finalName>${project.build.finalName}</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
                         </configuration>
                     </execution>
                 </executions>

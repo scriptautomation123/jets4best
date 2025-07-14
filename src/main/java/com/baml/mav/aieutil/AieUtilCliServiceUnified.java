@@ -2,7 +2,6 @@ package com.baml.mav.aieutil;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.logging.log4j.Logger;
@@ -16,10 +15,10 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-@Command(name = "aieutil", mixinStandardHelpOptions = true, version = "1.0.0", description = "Minimal Oracle CLI utility")
-public class AieUtilCliService implements Callable<Integer> {
+@Command(name = "aieutil-unified", mixinStandardHelpOptions = true, version = "1.0.0", description = "Minimal Oracle CLI utility (Unified Architecture)")
+public class AieUtilCliServiceUnified implements Callable<Integer> {
     private static final YamlConfig appConfig = new YamlConfig(System.getProperty("config.file", "application.yaml"));
-    private static final Logger log = LoggingUtils.getLogger(AieUtilCliService.class);
+    private static final Logger log = LoggingUtils.getLogger(AieUtilCliServiceUnified.class);
 
     @Option(names = { "-t", "--type" }, description = "Database type (oracle/h2)", defaultValue = "oracle")
     private String type;
@@ -70,7 +69,7 @@ public class AieUtilCliService implements Callable<Integer> {
     private boolean helpExamples;
 
     public static void main(String[] args) {
-        CommandLine cmd = new CommandLine(new AieUtilCliService());
+        CommandLine cmd = new CommandLine(new AieUtilCliServiceUnified());
         cmd.setOut(new java.io.PrintWriter(System.out, true)); // NOSONAR
         cmd.setErr(new java.io.PrintWriter(System.err, true)); // NOSONAR
         int exitCode = executeWithCmd(cmd);
@@ -79,7 +78,7 @@ public class AieUtilCliService implements Callable<Integer> {
 
     public static int executeWithCmd(CommandLine cmd) {
         try {
-            return ((AieUtilCliService) cmd.getCommand()).callWithCmd(cmd);
+            return ((AieUtilCliServiceUnified) cmd.getCommand()).callWithCmd(cmd);
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "CLI execution error");
             return 1; // Ensure a return value in all code paths
@@ -87,7 +86,7 @@ public class AieUtilCliService implements Callable<Integer> {
     }
 
     @Override
-    public Integer call() throws Exception {
+    public Integer call() {
         return callWithCmd(new CommandLine(this));
     }
 
@@ -149,10 +148,9 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runSql(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
-            var result = db.runSql(sql, List.of());
-            printSqlResult(cmd, result);
-            log.info("SQL executed successfully");
+            UnifiedDatabaseService db = UnifiedDatabaseService.create(type, database, user, password, host);
+            printSqlResult(cmd, db.executeSql(sql));
+            log.info("SQL executed successfully (Unified Architecture)");
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "SQL error");
         }
@@ -160,10 +158,10 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runSqlScript(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
+            UnifiedDatabaseService db = UnifiedDatabaseService.create(type, database, user, password, host);
             String scriptContent = new String(Files.readAllBytes(Paths.get(script)));
             db.runSqlScript(scriptContent, result -> printSqlResult(cmd, result));
-            log.info("SQL script executed successfully");
+            log.info("SQL script executed successfully (Unified Architecture)");
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "SQL script error");
         }
@@ -171,23 +169,22 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runProcedure(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
-            var result = db.executeProcedure(procedure, null, null); // Adjust input/output params as needed
-            printProcedureResult(cmd, result);
-            log.info("Procedure executed successfully");
+            UnifiedDatabaseService db = UnifiedDatabaseService.create(type, database, user, password, host);
+            printProcedureResult(cmd, db.executeProcedureWithStrings(procedure, input, output));
+            log.info("Procedure executed successfully (Unified Architecture)");
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Procedure error");
         }
     }
 
     private void printYamlConfig(CommandLine cmd) {
-        cmd.getOut().println("=== Loaded application.yaml ===");
+        cmd.getOut().println("=== Loaded application.yaml (Unified Architecture) ===");
         cmd.getOut().println(appConfig.getAll());
         cmd.getOut().println("==============================");
     }
 
     private void printSampleConnectString(CommandLine cmd) {
-        cmd.getOut().println("=== SAMPLE ORACLE CONNECT STRING ===");
+        cmd.getOut().println("=== SAMPLE ORACLE CONNECT STRING (UNIFIED) ===");
         cmd.getOut().println("User: testuser");
         cmd.getOut().println(
                 "Connect string: jdbc:oracle:thin:@ldap://ldap.example.com:389/ORCL,cn=OracleContext,dc=example,dc=com");
@@ -198,10 +195,10 @@ public class AieUtilCliService implements Callable<Integer> {
         cmd.getOut().println(CliMessages.HELP_EXAMPLES);
     }
 
-    private void printSqlResult(CommandLine cmd, SqlExecutor.SqlResult result) {
+    private void printSqlResult(CommandLine cmd, UnifiedDatabaseService.SqlResult result) {
         if (result.isResultSet()) {
-            for (var row : result.rows()) {
-                for (var entry : row.entrySet()) {
+            for (java.util.Map<String, Object> row : result.rows()) {
+                for (java.util.Map.Entry<String, Object> entry : row.entrySet()) {
                     cmd.getOut().print(entry.getKey() + "=" + entry.getValue() + " ");
                 }
                 cmd.getOut().println();

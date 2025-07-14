@@ -1,11 +1,11 @@
 package com.baml.mav.aieutil.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-
 import java.io.File;
 import java.io.InputStream;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 public class YamlConfig {
     private final Map<String, Object> config;
@@ -25,7 +25,13 @@ public class YamlConfig {
                 return yaml.readValue(new File(path), Map.class);
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to load YAML config: " + path, e);
+            throw ExceptionUtils.wrap(
+                    e,
+                    "Could not find configuration file: " + path + "\n" +
+                            "• If running from your IDE, ensure " + path + " is in src/main/resources.\n" +
+                            "• If running as a fat jar, ensure " + path
+                            + " is in the same directory as the jar or specify -Dconfig.file/-Dvault.config.\n" +
+                            "Original error: " + e.getMessage());
         }
     }
 

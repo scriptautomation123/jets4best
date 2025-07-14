@@ -2,12 +2,17 @@
 <Configuration status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+            <JsonLayout compact="true" eventEol="true" />
         </Console>
     </Appenders>
     <Loggers>
+        <!-- Set DEBUG for your main package -->
+        <Logger name="com.baml.mav.aieutil" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console" />
+        </Logger>
+        <!-- Root logger for everything else -->
         <Root level="INFO">
-            <AppenderRef ref="Console"/>
+            <AppenderRef ref="Console" />
         </Root>
     </Loggers>
 </Configuration>

@@ -1,6 +1,6 @@
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
     <id>bundle</id>
     <formats>
         <format>zip</format>
@@ -37,24 +37,28 @@
 
         <!-- 4. Copy resource files (config, sql, etc.) -->
         <fileSet>
-            <directory>../src/main/resources</directory>
-            <outputDirectory>resources</outputDirectory>
+            <directory>${project.basedir}/src/main/resources</directory>
+            <outputDirectory>/</outputDirectory>
             <includes>
                 <include>application.yaml</include>
                 <include>vaults.yaml</include>
                 <include>log4j2.xml</include>
             </includes>
         </fileSet>
-        
+
 
     </fileSets>
 
     <dependencySets>
-        <!-- 6. Copy the main application JAR -->
+        <!-- 6. Copy the main application JAR only -->
         <dependencySet>
-            <outputDirectory>app</outputDirectory>
+            <outputDirectory>/</outputDirectory>
             <useProjectArtifact>true</useProjectArtifact>
             <scope>runtime</scope>
+            <!-- Only include our project artifact, not transitive dependencies -->
+            <includes>
+                <include>${project.groupId}:${project.artifactId}</include>
+            </includes>
         </dependencySet>
     </dependencySets>
 </assembly>

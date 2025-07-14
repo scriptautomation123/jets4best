@@ -42,6 +42,7 @@
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
+            <id>shade-uberjar</id>
             <phase>package</phase>
             <goals>
               <goal>shade</goal>
@@ -77,27 +78,20 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
+        <version>${exec.plugin.version}</version>
         <executions>
           <execution>
-            <id>run-jlink</id>
+            <id>run-jlink-helper</id>
             <phase>package</phase>
             <goals>
-              <goal>exec</goal>
+              <goal>java</goal>
             </goals>
             <configuration>
-              <executable>jlink</executable>
+              <mainClass>com.baml.mav.aieutil.buildhelpers.JlinkHelper</mainClass>
               <arguments>
-                <argument>--module-path</argument>
-                <argument>${java.home}/jmods/target/dependency</argument>
-                <argument>--add-modules</argument>
-                <argument>java.base,java.sql,java.naming,java.logging,java.management,jdk.unsupported</argument>
-                <argument>--output</argument>
+                <argument>${project.build.directory}/${project.build.finalName}.jar</argument>
+                <argument>${env.JAVA_HOME}/jmods</argument>
                 <argument>${project.build.directory}/jre</argument>
-                <argument>--strip-debug</argument>
-                <argument>--no-man-pages</argument>
-                <argument>--no-header-files</argument>
-                <argument>--compress</argument>
-                <argument>zip-2</argument>
               </arguments>
             </configuration>
           </execution>
@@ -116,8 +110,8 @@
               <descriptors>
                 <descriptor>src/main/assembly/bundle.xml</descriptor>
               </descriptors>
-              <finalName>${project.artifactId}-${project.version}</finalName>
-              <appendAssemblyId>true</appendAssemblyId>
+              <finalName>${project.build.finalName}</finalName>
+              <appendAssemblyId>false</appendAssemblyId>
             </configuration>
           </execution>
         </executions>
@@ -156,6 +150,11 @@
         <artifactId>h2</artifactId>
         <version>${h2.version}</version>
       </dependency>
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>${picocli.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <properties>
@@ -166,6 +165,7 @@
     <h2.version>2.2.224</h2.version>
     <jackson.version>2.15.3</jackson.version>
     <exec.plugin.version>3.5.1</exec.plugin.version>
+    <picocli.version>4.7.1</picocli.version>
     <assembly.plugin.version>3.7.1</assembly.plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
