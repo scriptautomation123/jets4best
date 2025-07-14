@@ -1,113 +1,97 @@
 #!/bin/bash
 
-# AIE Util Runner Script
-# This script runs the AIE Util application using the bundled JRE and resources
+set -e
 
-# Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUNDLE_DIR="$(dirname "$SCRIPT_DIR")"
+BUNDLE_DIR="$SCRIPT_DIR"
 
-# Function to find the bundle directory from any location
-find_bundle_dir() {
-    local jar_path="$1"
-    local current_dir="$(dirname "$jar_path")"
-    
-    # Check if we're in the bundle directory (has jre/ and resources/ folders)
-    if [ -d "$current_dir/jre" ] && [ -d "$current_dir/resources" ]; then
-        echo "$current_dir"
-        return 0
-    fi
-    
-    # Check if we're in a subdirectory of the bundle
-    local parent_dir="$(dirname "$current_dir")"
-    if [ -d "$parent_dir/jre" ] && [ -d "$parent_dir/resources" ]; then
-        echo "$parent_dir"
-        return 0
-    fi
-    
-    # If not found, assume the JAR is standalone (no bundle structure)
-    echo "$current_dir"
-    return 1
-}
-
-# Function to find the JAR file dynamically
 find_jar_file() {
     local dir="$1"
-    # Look for JAR files with pattern: aieutil-*-with-dependencies.jar
-    find "$dir" -maxdepth 1 -name "aieutil-*-with-dependencies.jar" 2>/dev/null | head -1
+    find "$dir" -maxdepth 1 -name "aieutil-*.jar" 2>/dev/null | head -1
 }
 
-# Determine the actual JAR file path
-JAR_FILE=""
-if [ -n "$1" ] && [ -f "$1" ]; then
-    # JAR path provided as argument
-    JAR_FILE="$1"
-    BUNDLE_ROOT="$(find_bundle_dir "$JAR_FILE")"
-else
-    # Look for JAR in bundle directory
     JAR_FILE="$(find_jar_file "$BUNDLE_DIR")"
-    if [ -n "$JAR_FILE" ] && [ -f "$JAR_FILE" ]; then
-        BUNDLE_ROOT="$BUNDLE_DIR"
-    else
-        echo "Error: No aieutil-*-with-dependencies.jar found in bundle directory"
-        echo "Usage: $0 [path/to/aieutil-*-with-dependencies.jar] [options...]"
-        echo "       $0 [options...] (when run from bundle directory)"
-        exit 1
-    fi
-fi
-
-# Set up paths relative to bundle root
-JRE_DIR="$BUNDLE_ROOT/jre"
-RESOURCES_DIR="$BUNDLE_ROOT/resources"
-DRIVERS_DIR="$BUNDLE_ROOT/drivers"
-
-# Check if JAR exists
 if [ ! -f "$JAR_FILE" ]; then
-    echo "Error: JAR file not found at $JAR_FILE"
+    echo "Error: No aieutil-*.jar found in bundle directory"
     exit 1
 fi
 
-# Set up Java options
-JAVA_OPTS="-Dfile.encoding=UTF-8"
-
-# Add log4j config if resources directory exists
-if [ -d "$RESOURCES_DIR" ] && [ -f "$RESOURCES_DIR/log4j2.xml" ]; then
-    JAVA_OPTS="$JAVA_OPTS -Dlog4j.configurationFile=$RESOURCES_DIR/log4j2.xml"
-fi
-
-# Add drivers to classpath if they exist
-if [ -d "$DRIVERS_DIR" ]; then
-    for driver in "$DRIVERS_DIR"/*.jar; do
-        if [ -f "$driver" ]; then
-            JAVA_OPTS="$JAVA_OPTS -cp $driver"
-        fi
-    done
-fi
-
-# Use bundled JRE if available, otherwise use system Java
+JRE_DIR="$BUNDLE_DIR/jre"
+JAVA_CMD="java"
 if [ -d "$JRE_DIR" ] && [ -x "$JRE_DIR/bin/java" ]; then
     JAVA_CMD="$JRE_DIR/bin/java"
     echo "Using bundled JRE: $JRE_DIR"
 else
-    JAVA_CMD="java"
     echo "Using system Java"
 fi
 
-# Determine arguments to pass to the JAR
-if [ -n "$1" ] && [ -f "$1" ]; then
-    # Script was called with JAR path, shift off the first argument
-    shift
-    JAR_ARGS="$@"
-else
-    # Script is in bundle, pass all arguments
-    JAR_ARGS="$@"
+JAVA_OPTS="-Dfile.encoding=UTF-8"
+if [ -f "$BUNDLE_DIR/log4j2.xml" ]; then
+    JAVA_OPTS="$JAVA_OPTS -Dlog4j.configurationFile=$BUNDLE_DIR/log4j2.xml"
 fi
 
-# Run the application
-echo "Starting AIE Util..."
+print_config() {
+    echo "Bundle Root: $BUNDLE_DIR"
 echo "JAR: $JAR_FILE"
-echo "Bundle Root: $BUNDLE_ROOT"
-echo "Resources: $RESOURCES_DIR"
+    echo "JRE: $JRE_DIR"
 echo "Java: $JAVA_CMD"
+    echo "Log4j2: $BUNDLE_DIR/log4j2.xml"
+    echo "Application config: $BUNDLE_DIR/application.yaml"
+    echo "Vault config: $BUNDLE_DIR/vaults.yaml"
+}
 
-exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" $JAR_ARGS 
+run_cli() {
+    shift # Remove 'cli' from args
+    exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" "$@"
+}
+
+run_demo() {
+    shift # Remove 'demo' from args
+    case "$1" in
+        vault-demo-urls)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" vault-demo --vault-url http://localhost:8200 --role-id myrole --secret-id mysecret --db ORCL --ait DEV --user scott
+            ;;
+        vault-demo-real)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" vault-demo --from-config --db ORCL --user scott --real
+            ;;
+        vault-demo-direct)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" vault-demo --vault-url http://localhost:8200 --role-id myrole --secret-id mysecret --db ORCL --ait DEV --user scott --real
+            ;;
+        cli-help)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" --help
+            ;;
+        cli-print-config)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" --print-config
+            ;;
+        cli-sample-connect)
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" --sample-connect
+            ;;
+        *)
+            echo "Unknown or missing demo: $1"
+            echo "Available demos: vault-demo-urls, vault-demo-real, vault-demo-direct, cli-help, cli-print-config, cli-sample-connect"
+            exit 1
+            ;;
+    esac
+}
+
+case "$1" in
+    print-config)
+        print_config
+        ;;
+    cli)
+        run_cli "$@"
+        ;;
+    demo)
+        run_demo "$@"
+        ;;
+    ""|help|--help|-h)
+        echo "Usage: $0 [print-config|cli <args>|demo <demo-name>]"
+        echo "  print-config         Print bundle and config info"
+        echo "  cli <args>           Run the main CLI with arguments"
+        echo "  demo <demo-name>     Run a named demo (vault-demo-urls, vault-demo-real, vault-demo-direct, cli-help, cli-print-config, cli-sample-connect)"
+        ;;
+    *)
+        # Default: run as CLI
+        exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" "$@"
+        ;;
+esac 

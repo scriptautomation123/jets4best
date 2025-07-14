@@ -6,6 +6,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.logging.log4j.Logger;
 
+import com.baml.mav.aieutil.database.UnifiedDatabaseService;
 import com.baml.mav.aieutil.util.CliMessages;
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;

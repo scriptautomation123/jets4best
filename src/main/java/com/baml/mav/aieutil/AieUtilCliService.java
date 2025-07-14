@@ -7,9 +7,12 @@ import java.util.concurrent.Callable;
 
 import org.apache.logging.log4j.Logger;
 
+import com.baml.mav.aieutil.database.DatabaseService;
+import com.baml.mav.aieutil.database.SqlExecutor;
 import com.baml.mav.aieutil.util.CliMessages;
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;
+import com.baml.mav.aieutil.util.VaultClient;
 import com.baml.mav.aieutil.util.YamlConfig;
 
 import picocli.CommandLine;
@@ -30,10 +33,13 @@ public class AieUtilCliService implements Callable<Integer> {
     @Option(names = { "-u", "--user" }, description = "Username", required = true)
     private String user;
 
-    @Option(names = { "-p", "--password" }, description = "Password", required = true)
+    @Option(names = { "-p", "--password" }, description = "Password (optional if using Vault)")
     private String password;
 
-    @Option(names = { "-r", "--role" }, description = "Role")
+    @Option(names = { "--vault" }, description = "Use Vault for password lookup")
+    private boolean useVault;
+
+    @Option(names = { "--role" }, description = "Role")
     private String role;
 
     @Option(names = { "--secret" }, description = "Secret")
@@ -71,8 +77,8 @@ public class AieUtilCliService implements Callable<Integer> {
 
     public static void main(String[] args) {
         CommandLine cmd = new CommandLine(new AieUtilCliService());
-        cmd.setOut(new java.io.PrintWriter(System.out, true)); // NOSONAR
-        cmd.setErr(new java.io.PrintWriter(System.err, true)); // NOSONAR
+        cmd.setOut(new java.io.PrintWriter(System.out, true));
+        cmd.setErr(new java.io.PrintWriter(System.err, true));
         int exitCode = executeWithCmd(cmd);
         System.exit(exitCode);
     }
@@ -82,7 +88,7 @@ public class AieUtilCliService implements Callable<Integer> {
             return ((AieUtilCliService) cmd.getCommand()).callWithCmd(cmd);
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "CLI execution error");
-            return 1; // Ensure a return value in all code paths
+            return 1;
         }
     }
 
@@ -123,7 +129,7 @@ public class AieUtilCliService implements Callable<Integer> {
             };
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "CLI execution error");
-            return 1; // Ensure a return value in all code paths
+            return 1;
         }
     }
 
@@ -149,7 +155,8 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runSql(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
+            String resolvedPassword = resolvePassword(cmd);
+            DatabaseService db = DatabaseService.create(type, database, user, resolvedPassword, host);
             var result = db.runSql(sql, List.of());
             printSqlResult(cmd, result);
             log.info("SQL executed successfully");
@@ -160,7 +167,8 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runSqlScript(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
+            String resolvedPassword = resolvePassword(cmd);
+            DatabaseService db = DatabaseService.create(type, database, user, resolvedPassword, host);
             String scriptContent = new String(Files.readAllBytes(Paths.get(script)));
             db.runSqlScript(scriptContent, result -> printSqlResult(cmd, result));
             log.info("SQL script executed successfully");
@@ -171,13 +179,32 @@ public class AieUtilCliService implements Callable<Integer> {
 
     private void runProcedure(CommandLine cmd) {
         try {
-            DatabaseService db = DatabaseService.create(type, database, user, password, host);
-            var result = db.executeProcedure(procedure, null, null); // Adjust input/output params as needed
+            String resolvedPassword = resolvePassword(cmd);
+            DatabaseService db = DatabaseService.create(type, database, user, resolvedPassword, host);
+            var result = db.executeProcedure(procedure, null, null);
             printProcedureResult(cmd, result);
             log.info("Procedure executed successfully");
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Procedure error");
         }
+    }
+
+    private String resolvePassword(CommandLine cmd) {
+        if (password != null && !password.isEmpty()) {
+            return password;
+        }
+
+        if (useVault) {
+            VaultClient client = new VaultClient();
+            String vaultPassword = client.fetchOraclePassword(user);
+            if (vaultPassword != null) {
+                return vaultPassword;
+            }
+            throw new ExceptionUtils.ConfigurationException("No password found in Vault for user: " + user);
+        }
+
+        throw new ExceptionUtils.ConfigurationException(
+                "Password required. Provide --password or use --vault for Vault lookup.");
     }
 
     private void printYamlConfig(CommandLine cmd) {

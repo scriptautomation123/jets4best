@@ -68,7 +68,7 @@
               </filters>
               <transformers>
                 <transformer>
-                  <mainClass>com.baml.mav.aieutil.AieUtilCli</mainClass>
+                  <mainClass>com.baml.mav.aieutil.VaultDemoCli</mainClass>
                 </transformer>
               </transformers>
             </configuration>

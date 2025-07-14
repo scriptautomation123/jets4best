@@ -6,33 +6,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 
 import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/**
- * Comprehensive Vault client with HTTP operations and response parsing.
- * Handles authentication, password fetching, and response processing.
- */
 public final class VaultClient {
     private static final String CLIENT_TOKEN_PATH = "/auth/client_token";
     private static final String PASSWORD_PATH = "/data/password";
     private static final ObjectMapper mapper = new ObjectMapper();
-
-    public record VaultConfig(String baseUrl, String roleId, String secretId) {
-        public VaultConfig {
-            Objects.requireNonNull(baseUrl, "Base URL cannot be null");
-            Objects.requireNonNull(roleId, "Role ID cannot be null");
-            Objects.requireNonNull(secretId, "Secret ID cannot be null");
-        }
-    }
-
-    private static YamlConfig getConfigManager() {
-        return new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
-    }
 
     private final HttpClient client;
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
@@ -48,10 +32,36 @@ public final class VaultClient {
                 .build();
     }
 
-    // ============================================================================
-    // PASSWORD FETCHING OPERATIONS
-    // ============================================================================
+    // Main method: fetch password using just user (looks up vault params from
+    // vaults.json)
+    public String fetchOraclePassword(String user) {
+        logger.info("Fetching Oracle password for user: {}", user);
 
+        try {
+            // Look up vault parameters from vaults.json
+            Map<String, Object> params = getVaultParamsForUser(user);
+            if (params.isEmpty()) {
+                logger.warn("No vault entry found for user: {}", user);
+                return null; // Return null to trigger password prompt
+            }
+
+            // Extract vault parameters
+            String vaultBaseUrl = (String) params.get("base-url");
+            String roleId = (String) params.get("role-id");
+            String secretId = (String) params.get("secret-id");
+            String ait = (String) params.get("ait");
+            String dbName = (String) params.get("db");
+
+            // Fetch password using the found parameters
+            return fetchOraclePassword(vaultBaseUrl, roleId, secretId, dbName, ait, user);
+
+        } catch (Exception e) {
+            logger.error("Failed to fetch Oracle password for user: {}", user, e);
+            return null; // Return null to trigger password prompt
+        }
+    }
+
+    // Legacy method: fetch password with explicit parameters
     public String fetchOraclePassword(String vaultBaseUrl, String roleId, String secretId, String dbName, String ait,
             String username) {
         logger.info("Fetching Oracle password for database: {}, AIT: {}, username: {}", dbName, ait, username);
@@ -69,66 +79,34 @@ public final class VaultClient {
         }
     }
 
-    public PasswordFetcher fetchPassword() {
-        return new PasswordFetcher();
-    }
-
-    public final class PasswordFetcher {
-        private String databaseName;
-        private String username;
-
-        public PasswordFetcher forDatabase(String databaseName) {
-            this.databaseName = databaseName;
-            return this;
-        }
-
-        public PasswordFetcher forUser(String username) {
-            this.username = username;
-            return this;
-        }
-
-        public String execute() {
-            Objects.requireNonNull(databaseName, "Database name cannot be null");
-            Objects.requireNonNull(username, "Username cannot be null");
-
-            logger.debug("Fetching password from Vault for database: {}, username: {}", databaseName, username);
-
-            try {
-                String clientToken = authenticateToVault(
-                        getConfigManager().getRawValue("vault.base-url"),
-                        getConfigManager().getRawValue("vault.role-id"),
-                        getConfigManager().getRawValue("vault.secret-id"));
-
-                String secretPath = String.format(
-                        "%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
-                        getConfigManager().getRawValue("vault.base-url"),
-                        getConfigManager().getRawValue("vault.ait"),
-                        databaseName,
-                        username).toLowerCase();
-
-                String response = httpGet(secretPath, Map.of("x-vault-token", clientToken));
-
-                String password = parseJsonField(response, PASSWORD_PATH);
-                if (password == null || password.isEmpty()) {
-                    throw new ExceptionUtils.ConfigurationException("No password found in Vault response");
+    // Static method to get vault parameters by user id from vaults.json
+    public static Map<String, Object> getVaultParamsForUser(String user) {
+        YamlConfig config = new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
+        Object vaultsObj = config.getAll().get("vaults");
+        if (vaultsObj instanceof java.util.List<?> vaultsList) {
+            for (Object entry : vaultsList) {
+                Map<String, Object> result = tryGetVaultEntry(entry, user);
+                if (!result.isEmpty()) {
+                    return result;
                 }
-
-                logger.debug("Successfully retrieved password from Vault for user: {}", username);
-                return password;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new ExceptionUtils.ConfigurationException("Thread interrupted while fetching password from Vault",
-                        e);
-            } catch (Exception e) {
-                logger.error("Failed to fetch password from Vault", e);
-                throw new ExceptionUtils.ConfigurationException("Failed to fetch password from Vault", e);
             }
         }
+        return Collections.emptyMap();
     }
 
-    // ============================================================================
-    // HTTP OPERATIONS
-    // ============================================================================
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> tryGetVaultEntry(Object entry, String user) {
+        if (entry instanceof Map<?, ?> map) {
+            Object entryId = map.get("id");
+            if (entryId != null && entryId.toString().equals(user)) {
+                boolean allStringKeys = map.keySet().stream().allMatch(String.class::isInstance);
+                if (allStringKeys) {
+                    return (Map<String, Object>) map;
+                }
+            }
+        }
+        return Collections.emptyMap();
+    }
 
     private String authenticateToVault(String vaultBaseUrl, String roleId, String secretId)
             throws IOException, InterruptedException {
@@ -190,10 +168,6 @@ public final class VaultClient {
         return response.body();
     }
 
-    // ============================================================================
-    // RESPONSE PARSING
-    // ============================================================================
-
     private String parsePasswordFromResponse(String secretResponseBody) {
         try {
             String password = parseJsonField(secretResponseBody, PASSWORD_PATH);
@@ -222,17 +196,5 @@ public final class VaultClient {
             logger.error("Failed to parse JSON field: {}", path, e);
             return null;
         }
-    }
-
-    // ============================================================================
-    // CONNECTION TYPE UTILITIES
-    // ============================================================================
-
-    public boolean isLdapConnection(String connectionType) {
-        return "ldap".equalsIgnoreCase(connectionType);
-    }
-
-    public boolean isJdbcConnection(String connectionType) {
-        return "jdbc".equalsIgnoreCase(connectionType);
     }
 }

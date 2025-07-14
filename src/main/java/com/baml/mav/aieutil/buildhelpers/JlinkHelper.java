@@ -17,6 +17,10 @@ public class JlinkHelper {
         Path jmodsPath = Paths.get(args[1]);
         Path outputJreDir = Paths.get(args[2]);
 
+        System.out.println("[INFO] === AIE Util Bundle Information ==="); // NOSONAR
+        System.out.println("[INFO] JAR file: " + jarPath.toAbsolutePath()); // NOSONAR
+        System.out.println("[INFO] JRE output: " + outputJreDir.toAbsolutePath()); // NOSONAR
+
         if (!Files.exists(jarPath)) {
             System.err.println("JAR file does not exist: " + jarPath); // NOSONAR
             System.exit(2);
@@ -26,7 +30,9 @@ public class JlinkHelper {
             System.exit(3);
         }
 
-        // 1. Run jdeps to get required modules
+        long jarSize = Files.size(jarPath);
+        System.out.println("[INFO] JAR size: " + (jarSize / 1024 / 1024) + " MB"); // NOSONAR
+
         String[] jdepsCmd = new String[] {
                 "jdeps",
                 "--print-module-deps",
@@ -35,16 +41,18 @@ public class JlinkHelper {
                 "--recursive",
                 jarPath.toString()
         };
-        System.out.println("Running jdeps..."); // NOSONAR
+        System.out.println("[INFO] Running jdeps..."); // NOSONAR
         String modules = runAndCapture(jdepsCmd);
         if (modules == null || modules.trim().isEmpty()) {
             System.err.println("jdeps did not return any modules. Aborting."); // NOSONAR
             System.exit(4);
         }
         modules = modules.trim();
-        System.out.println("jdeps modules: " + modules); // NOSONAR
+        System.out.println("[INFO] jdeps modules: " + modules); // NOSONAR
 
-        // 2. Run jlink to build the custom JRE
+        int moduleCount = modules.split(",").length;
+        System.out.println("[INFO] Total modules required: " + moduleCount); // NOSONAR
+
         String[] jlinkCmd = new String[] {
                 "jlink",
                 "--module-path", jmodsPath.toString(),
@@ -55,13 +63,36 @@ public class JlinkHelper {
                 "--no-header-files",
                 "--compress", "zip-2"
         };
-        System.out.println("Running jlink..."); // NOSONAR
+        System.out.println("[INFO] Running jlink..."); // NOSONAR
         int jlinkExit = runAndStream(jlinkCmd);
         if (jlinkExit != 0) {
             System.err.println("jlink failed with exit code: " + jlinkExit); // NOSONAR
             System.exit(5);
         }
-        System.out.println("Custom JRE created at: " + outputJreDir); // NOSONAR
+
+        if (Files.exists(outputJreDir)) {
+            long jreSize = calculateDirectorySize(outputJreDir);
+            System.out.println("[INFO] Custom JRE created at: " + outputJreDir); // NOSONAR
+            System.out.println("[INFO] JRE size: " + (jreSize / 1024 / 1024) + " MB"); // NOSONAR
+            System.out.println("[INFO] Size reduction: " + ((jarSize - jreSize) / 1024 / 1024) + " MB saved"); // NOSONAR
+        }
+
+        System.out.println("[INFO] === Bundle Information Complete ==="); // NOSONAR
+    }
+
+    private static long calculateDirectorySize(Path dir) throws IOException {
+        try (var stream = Files.walk(dir)) {
+            return stream
+                    .filter(Files::isRegularFile)
+                    .mapToLong(path -> {
+                        try {
+                            return Files.size(path);
+                        } catch (IOException e) {
+                            return 0L;
+                        }
+                    })
+                    .sum();
+        }
     }
 
     private static String runAndCapture(String[] cmd) throws IOException, InterruptedException {

@@ -20,7 +20,8 @@
             <directory>${project.build.directory}</directory>
             <outputDirectory>/</outputDirectory>
             <includes>
-                <include>${project.artifactId}-${project.version}-with-dependencies.jar</include>
+                <include>${project.artifactId}-${project.version}.jar</include>
+                <include>${project.artifactId}-${project.version}-shaded.jar</include>
             </includes>
         </fileSet>
 

@@ -1,4 +1,4 @@
-package com.baml.mav.aieutil;
+package com.baml.mav.aieutil.database;
 
 import java.util.Objects;
 

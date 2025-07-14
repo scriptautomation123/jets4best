@@ -2,6 +2,7 @@ package com.baml.mav.aieutil.util;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,5 +51,21 @@ public class YamlConfig {
 
     public Map<String, Object> getAll() {
         return config;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getVaultEntryById(String id) {
+        Object vaultsObj = config.get("vaults");
+        if (vaultsObj instanceof java.util.List<?> vaultsList) {
+            for (Object entry : vaultsList) {
+                if (entry instanceof Map<?, ?> map) {
+                    Object entryId = map.get("id");
+                    if (entryId != null && entryId.toString().equals(id)) {
+                        return (Map<String, Object>) map;
+                    }
+                }
+            }
+        }
+        return Collections.emptyMap();
     }
 }
