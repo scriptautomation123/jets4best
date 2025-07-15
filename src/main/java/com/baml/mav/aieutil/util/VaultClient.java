@@ -107,6 +107,7 @@ public final class VaultClient {
         String authUrl = vaultBaseUrl + "/v1/auth/approle/login";
         String authBody = String.format("{\"role_id\":\"%s\",\"secret_id\":\"%s\"}", roleId, secretId);
 
+        logger.info("[DEBUG] Vault token URL: {}", authUrl);
         String response = httpPost(authUrl, authBody, Map.of("Content-Type", "application/json"));
 
         String clientToken = parseJsonField(response, CLIENT_TOKEN_PATH);
@@ -121,6 +122,7 @@ public final class VaultClient {
         String secretPath = String.format("%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
                 vaultBaseUrl, ait, dbName, username).toLowerCase();
 
+        logger.info("[DEBUG] Oracle password URL: {}", secretPath);
         return httpGet(secretPath, Map.of("x-vault-token", clientToken));
     }
 
