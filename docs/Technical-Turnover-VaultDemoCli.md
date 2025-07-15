@@ -1,157 +1,109 @@
-# Technical Turnover Document: VaultDemoCli
+# VaultDemoCli: Complete Technical Turnover & Architecture
 
 ---
 
-## Table of Contents
-1. [Introduction & Purpose](#introduction--purpose)
-2. [High-Level Architecture](#high-level-architecture)
-3. [CLI Modes & Parameter Validation](#cli-modes--parameter-validation)
-4. [Call Stacks & Execution Flows](#call-stacks--execution-flows)
-5. [Configuration & YAML Handling](#configuration--yaml-handling)
-6. [Vault Integration](#vault-integration)
-7. [LDAP JDBC String Generation](#ldap-jdbc-string-generation)
-8. [Output & Error Handling](#output--error-handling)
-9. [Testing & Automation](#testing--automation)
-10. [Code Quality, Linting, and Logging](#code-quality-linting-and-logging)
-11. [Extensibility & Future Work](#extensibility--future-work)
-12. [Appendix: All Diagrams](#appendix-all-diagrams)
+## Introduction
+
+This document provides a comprehensive, single-page technical turnover for the VaultDemoCli system. It covers the full architecture, design patterns, validation logic, integration flows, error handling, extensibility, and testing strategy. Each architectural and flow diagram is embedded and extensively described, providing a complete reference for maintainers and future developers.
 
 ---
 
-## 1. Introduction & Purpose
+## 1. Unified System Architecture Overview
 
-This document provides a comprehensive technical turnover for the `VaultDemoCli` Java CLI tool. It is intended for senior engineers and maintainers, and details the architecture, call stacks, validation logic, configuration, and integration points. All relevant diagrams are embedded and explained to ensure clarity and maintainability.
+![Unified System Architecture](docs/unified-architecture-docs.png)
 
----
-
-## 2. High-Level Architecture
-
-The VaultDemoCli is designed as a minimal, robust CLI for securely fetching Oracle database credentials from Vault and generating LDAP JDBC connection strings. The architecture enforces strict separation of concerns, explicit parameter validation, and clear output conventions.
-
-![Unified Architecture Overview](docs/out/diagrams34/unified-architecture-docs.png)
-*Diagram 1: Unified architecture showing CLI, service, and integration layers.*
-
-### Layered Responsibilities
-- **CLI Layer:** Argument parsing, user interaction, output routing.
-- **Service Layer:** Orchestration, validation, and flow control.
-- **Integration Layer:** Vault HTTP, YAML config, LDAP string generation.
-
-![Architecture Detail 1](docs/out/diagrams34/unified-architecture-docs-1.png)
-*Diagram 2: Detailed breakdown of CLI and service responsibilities.*
+This diagram presents the high-level architecture of the VaultDemoCli system. It illustrates the separation of concerns between the CLI layer (responsible for argument parsing and user interaction), the service layer (which orchestrates business logic, validation, and flow control), and the integration layer (handling external systems such as Vault, YAML configuration, and LDAP/JDBC string generation). The diagram emphasizes explicit boundaries between layers, ensuring maintainability, testability, and security. All data flows are unidirectional, and each layer exposes only minimal, well-defined interfaces to the next.
 
 ---
 
-## 3. CLI Modes & Parameter Validation
+## 2. CLI and Service Layer Responsibilities
 
-VaultDemoCli supports two mutually exclusive modes:
-- **Simple Mode:** `--user` and `--db` only. Vault parameters are looked up from `vaults.yaml`.
-- **Full Parameter Mode:** All vault parameters (`--vault-url`, `--role-id`, `--secret-id`, `--ait`, `--user`, `--db`) are provided explicitly.
+![CLI and Service Layer Responsibilities](docs/unified-architecture-docs-1.png)
 
-Any partial set of vault parameters is a hard error. The CLI enforces this at argument parsing time.
-
-![Parameter Validation Flow](docs/out/diagrams34/diagrams34-1.png)
-*Diagram 3: Parameter validation and mode selection logic.*
+This diagram zooms in on the CLI and service layers, detailing their respective responsibilities. The CLI layer is shown handling all user input, validation, and output routing, while the service layer manages orchestration, error handling, and delegation to integration components. The explicit handoff between CLI and service is highlighted, ensuring that all parameter validation and error reporting are performed before any integration logic is invoked. This pattern enforces robust input validation and clear error boundaries.
 
 ---
 
-## 4. Call Stacks & Execution Flows
+## 3. Service and Integration Layer Breakdown
 
-### CLI Entry and Flow
-- CLI entrypoint parses arguments.
-- Validates mode and parameters.
-- Delegates to service layer for orchestration.
+![Service and Integration Layer Breakdown](docs/unified-architecture-docs-2.png)
 
-![Call Stack Overview](docs/out/diagrams34/diagrams34-2.png)
-*Diagram 4: Call stack from CLI entry to service orchestration.*
-
-### Vault and LDAP Flows
-- In `--simulate` mode: prints URLs and connection strings, no HTTP calls.
-- In `--real` mode: performs Vault authentication, fetches secret, prints results.
-- Always prints Vault Auth URL, Vault Secret URL, and LDAP JDBC string.
-
-![Execution Flow](docs/out/diagrams34/diagrams34-3.png)
-*Diagram 5: Execution flow for both simulate and real modes, including error handling.*
+Here, the service layer is decomposed into its orchestration logic, with arrows indicating calls to integration components such as Vault HTTP clients, YAML configuration loaders, and LDAP/JDBC string builders. The diagram shows how the service layer acts as a coordinator, never directly exposing integration details to the CLI. Each integration component is depicted as a replaceable module, supporting future extensibility (e.g., adding new authentication backends or output formats).
 
 ---
 
-## 5. Configuration & YAML Handling
+## 4. Vault and LDAP Integration Details
 
-- Loads `application.yaml` for LDAP server configuration.
-- Loads `vaults.yaml` for mapping users/dbs to vault parameters in simple mode.
-- YAML parsing is strict; missing or malformed entries result in immediate errors.
-- Multi-server LDAP support is derived from YAML configuration.
+![Vault and LDAP Integration Details](docs/unified-architecture-docs-3.png)
 
----
-
-## 6. Vault Integration
-
-- Vault Auth URL and Secret URL are constructed as full HTTPS URLs.
-- In real mode, the CLI performs:
-  - POST to Vault Auth endpoint to obtain a client token.
-  - GET to Vault Secret endpoint to fetch the password.
-- All HTTP operations use Java 21's built-in HttpClient.
-- Errors in Vault communication are reported with minimal, user-focused output.
+This diagram details the flow for Vault authentication and LDAP JDBC string generation. It shows the sequence of HTTP calls to Vault (POST for authentication, GET for secret retrieval), the extraction of credentials, and the construction of a multi-server LDAP JDBC string using configuration from YAML. Failover and multi-server support are visually represented, demonstrating how the system ensures high availability and robust connection handling.
 
 ---
 
-## 7. LDAP JDBC String Generation
+## 5. Error Handling and Output Flow
 
-- LDAP JDBC connection string is generated using all configured servers from YAML.
-- The string is always printed, regardless of Vault lookup success.
-- Supports Oracle failover and multi-server syntax as per configuration.
+![Error Handling and Output Flow](docs/unified-architecture-docs-4.png)
 
----
-
-## 8. Output & Error Handling
-
-- All output is routed through `cmd.getOut()`; errors through `cmd.getErr()`.
-- Console output is minimal and user-focused, with technical details logged.
-- No password prompts or DB connections are performed; only information is printed.
+This diagram illustrates the error handling strategy across all layers. It shows how errors are caught at the boundaries (e.g., during file parsing, HTTP calls, or parameter validation), wrapped in application-specific exceptions, and routed to the appropriate output stream (`cmd.getErr()`). The diagram emphasizes minimal, user-focused error output on the console, with technical details logged for maintainers. The flow ensures that no stack traces or sensitive information are leaked to end users.
 
 ---
 
-## 9. Testing & Automation
+## 6. YAML Configuration and Validation
 
-- Shell scripts (`vault-demo.sh`, etc.) automate both modes and validate output.
-- Scripts are used for regression and interactive testing.
-- All flows are covered, including error cases and edge conditions.
+![YAML Configuration and Validation](docs/unified-architecture-docs-5.png)
 
----
-
-## 10. Code Quality, Linting, and Logging
-
-- All logging uses `AieUtil.getLogger()` as per project standards.
-- Linter and code quality issues (unused variables, string constants, etc.) are proactively fixed.
-- No direct logger instantiation or exception throwing; all error handling uses project utilities.
+This diagram visualizes the process of loading and validating YAML configuration files (`application.yaml`, `vaults.yaml`). It shows the strict parsing logic, schema validation, and the derivation of multi-server LDAP settings. The diagram highlights how missing or malformed entries result in immediate, user-visible errors, preventing misconfiguration and runtime surprises. The configuration layer is depicted as a foundation for all connection logic.
 
 ---
 
-## 11. Extensibility & Future Work
+## 7. Testing and Automation Flows
 
-- The architecture supports future extension to additional authentication modes or output formats.
-- All configuration is externalized for maintainability.
-- Strict validation and separation of concerns facilitate safe refactoring and feature addition.
+![Testing and Automation Flows](docs/unified-architecture-docs-6.png)
 
----
-
-## 12. Appendix: All Diagrams
-
-Below is a complete list of all diagrams referenced in this document, with technical captions for each.
-
-| Diagram | Filename | Description |
-|---------|----------|-------------|
-| 1 | unified-architecture-docs.png | Unified architecture overview |
-| 2 | unified-architecture-docs-1.png | CLI and service responsibilities |
-| 3 | unified-architecture-docs-2.png | Service and integration breakdown |
-| 4 | unified-architecture-docs-3.png | Vault and LDAP integration details |
-| 5 | unified-architecture-docs-4.png | Error handling and output flow |
-| 6 | unified-architecture-docs-5.png | YAML configuration and validation |
-| 7 | unified-architecture-docs-6.png | Testing and automation flows |
-| 8 | unified-architecture-docs-7.png | Extensibility and future work |
-| 9 | diagrams34-1.png | Parameter validation and mode selection |
-| 10 | diagrams34-2.png | Call stack overview |
-| 11 | diagrams34-3.png | Execution flow for simulate/real modes |
+This diagram documents the automated testing and validation flows. It shows how shell scripts (e.g., `vault-demo.sh`) exercise both CLI modes, validate output, and cover all edge cases. The diagram includes regression and interactive testing paths, ensuring that all flows (including error cases) are continuously validated. This supports rapid iteration and safe refactoring.
 
 ---
 
-**End of Document** 
+## 8. Extensibility and Future Work
+
+![Extensibility and Future Work](docs/unified-architecture-docs-7.png)
+
+This diagram outlines the system’s extensibility points. It shows how new authentication modes, output formats, or integration backends can be added by plugging into the integration layer, without modifying the CLI or service orchestration logic. Configuration-driven registration and modular design are emphasized, supporting forward-only evolution and maintainability.
+
+---
+
+## 9. Parameter Validation and Mode Selection
+
+![Parameter Validation and Mode Selection](docs/diagrams34-1.png)
+
+This diagram details the CLI’s parameter validation logic. It visually distinguishes between “Simple Mode” (minimal parameters, YAML lookup) and “Full Parameter Mode” (all Vault parameters provided). The flowchart shows how any partial or mixed parameter set results in a hard error, enforcing strict mode separation and preventing ambiguous behavior.
+
+---
+
+## 10. Call Stack Overview
+
+![Call Stack Overview](docs/diagrams34-2.png)
+
+This diagram presents the call stack from CLI entrypoint through argument parsing, validation, service orchestration, and integration calls. It highlights the explicit boundaries and the single-responsibility principle at each stack frame. The diagram is useful for onboarding new maintainers, as it clarifies the end-to-end execution path for any CLI invocation.
+
+---
+
+## 11. Execution Flow for Simulate/Real Modes
+
+![Execution Flow for Simulate/Real Modes](docs/diagrams34-3.png)
+
+This diagram shows the full execution flow for both `--simulate` and `--real` modes. It includes all branches: parameter validation, Vault authentication, secret retrieval, LDAP string generation, and output. Error handling paths are clearly marked, showing how failures at any stage are reported and do not cascade.
+
+---
+
+## 12. Composite/Summary Diagram
+
+![Composite or Summary Diagram](docs/diagrams34.png)
+
+This diagram provides a holistic view of the entire CLI lifecycle, from argument parsing through to output, including all major decision points and error handling branches. It is ideal for high-level presentations or as a reference for future architectural changes.
+
+---
+
+## Summary
+
+This single-page technical turnover document embeds and explains every architectural and flow diagram for VaultDemoCli. It provides a complete, scrollable reference for onboarding, maintenance, and future extension, ensuring that all design decisions, validation logic, integration flows, and extensibility points are fully documented and visually accessible. 
