@@ -26,6 +26,11 @@
           <artifactId>maven-assembly-plugin</artifactId>
           <version>${assembly.plugin.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>versions-maven-plugin</artifactId>
+          <version>2.18.0</version>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -68,7 +73,7 @@
               </filters>
               <transformers>
                 <transformer>
-                  <mainClass>com.baml.mav.aieutil.VaultDemoCli</mainClass>
+                  <mainClass>com.baml.mav.aieutil.ExecProcCmd</mainClass>
                 </transformer>
               </transformers>
             </configuration>
@@ -118,6 +123,51 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>manage-versions</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>versions-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>display-updates</id>
+                <goals>
+                  <goal>display-dependency-updates</goal>
+                  <goal>display-plugin-updates</goal>
+                  <goal>display-property-updates</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>update-dependency-properties</id>
+                <goals>
+                  <goal>update-properties</goal>
+                </goals>
+                <configuration>
+                  <autoLinkItems>true</autoLinkItems>
+                  <includeProperties>.*\.version</includeProperties>
+                  <allowMajorUpdates>false</allowMajorUpdates>
+                  <allowMinorUpdates>true</allowMinorUpdates>
+                  <allowIncrementalUpdates>true</allowIncrementalUpdates>
+                  <allowSnapshots>false</allowSnapshots>
+                </configuration>
+              </execution>
+              <execution>
+                <id>display-updates-post</id>
+                <goals>
+                  <goal>display-dependency-updates</goal>
+                  <goal>display-plugin-updates</goal>
+                  <goal>display-property-updates</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -154,6 +204,11 @@
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.18.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

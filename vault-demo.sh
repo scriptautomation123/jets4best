@@ -82,6 +82,8 @@ fi
 cd aieutil-1.0.0 || error_exit "Failed to change to aieutil-1.0.0 directory"
 
 # Check if JAR file exists
+
+
 if [ ! -f "aieutil-1.0.0.jar" ]; then
     error_exit "aieutil-1.0.0.jar not found in extracted directory"
 fi

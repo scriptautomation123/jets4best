@@ -63,6 +63,11 @@
                 <artifactId>picocli</artifactId>
                 <version>${picocli.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.18.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -123,6 +128,11 @@
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>${assembly.plugin.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>2.18.0</version>
+                </plugin>
             </plugins>
         </pluginManagement>
 
@@ -173,7 +183,7 @@
                             <transformers>
                                 <transformer
                                     implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.baml.mav.aieutil.VaultDemoCli</mainClass>
+                                    <mainClass>com.baml.mav.aieutil.ExecProcCmd</mainClass>
                                 </transformer>
                             </transformers>
 
@@ -230,4 +240,60 @@
 
         </plugins>
     </build>
+
+
+    <profiles>
+        <!-- Checks and validates all versions to make sure we're up to date-->
+        <profile>
+            <id>manage-versions</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>versions-maven-plugin</artifactId>
+                        <executions>
+                            <!-- Display available updates -->
+                            <execution>
+                                <id>display-updates</id>
+                                <goals>
+                                    <goal>display-dependency-updates</goal>
+                                    <goal>display-plugin-updates</goal>
+                                    <goal>display-property-updates</goal>
+                                </goals>
+                            </execution>
+
+                            <!-- Update dependency properties -->
+                            <execution>
+                                <id>update-dependency-properties</id>
+                                <goals>
+                                    <goal>update-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <autoLinkItems>true</autoLinkItems>
+                                    <includeProperties>.*\.version</includeProperties>
+                                    <allowMajorUpdates>false</allowMajorUpdates>
+                                    <allowMinorUpdates>true</allowMinorUpdates>
+                                    <allowIncrementalUpdates>true</allowIncrementalUpdates>
+                                    <allowSnapshots>false</allowSnapshots>
+                                </configuration>
+                            </execution>
+
+                            <!-- Post-update check for available updates -->
+                            <execution>
+                                <id>display-updates-post</id>
+                                <goals>
+                                    <goal>display-dependency-updates</goal>
+                                    <goal>display-plugin-updates</goal>
+                                    <goal>display-property-updates</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+
+    </profiles>
+
 </project>

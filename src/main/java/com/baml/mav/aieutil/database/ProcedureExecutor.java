@@ -117,38 +117,15 @@ public class ProcedureExecutor {
         return "{call " + procedureName + q + "}";
     }
 
-    // Modern pattern matching
-    private void setParameter(CallableStatement stmt, int index, Object value) throws SQLException {
-        switch (value) {
-            case Integer i -> stmt.setInt(index, i);
-            case Double d -> stmt.setDouble(index, d);
-            case String s -> stmt.setString(index, s);
-            case Boolean b -> stmt.setBoolean(index, b);
-            case null -> stmt.setNull(index, Types.NULL);
-            default -> stmt.setObject(index, value);
-        }
-    }
-
-    // Simplified JDBC type mapping
-    private int getJdbcType(String type) {
-        return switch (type.toUpperCase()) {
-            case "STRING", "VARCHAR", "VARCHAR2" -> Types.VARCHAR;
-            case "INTEGER", "INT" -> Types.INTEGER;
-            case "DOUBLE", "NUMBER" -> Types.DOUBLE;
-            case "DATE" -> Types.DATE;
-            case "TIMESTAMP" -> Types.TIMESTAMP;
-            case "BOOLEAN" -> Types.BOOLEAN;
-            default -> Types.OTHER;
-        };
-    }
-
     // New method for CLI string parameter parsing
     public Map<String, Object> executeProcedureWithStrings(String procFullName, String inputParams, String outputParams)
             throws SQLException {
         log.info("Executing procedure with string parameters: {}", procFullName);
         try {
             List<ProcedureParam> inputs = parseStringInputParams(inputParams);
+
             List<ProcedureParam> outputs = parseStringOutputParams(outputParams);
+
             String callSql = buildCallString(procFullName, inputs.size(), outputs.size());
             log.debug("Generated call SQL: {}", callSql);
             try (Connection conn = connectionSupplier.get();
@@ -211,4 +188,30 @@ public class ProcedureExecutor {
             throw new IllegalStateException("Unreachable");
         }
     }
+
+    // Modern pattern matching
+    private void setParameter(CallableStatement stmt, int index, Object value) throws SQLException {
+        switch (value) {
+            case Integer i -> stmt.setInt(index, i);
+            case Double d -> stmt.setDouble(index, d);
+            case String s -> stmt.setString(index, s);
+            case Boolean b -> stmt.setBoolean(index, b);
+            case null -> stmt.setNull(index, Types.NULL);
+            default -> stmt.setObject(index, value);
+        }
+    }
+
+    // Simplified JDBC type mapping
+    private int getJdbcType(String type) {
+        return switch (type.toUpperCase()) {
+            case "STRING", "VARCHAR", "VARCHAR2" -> Types.VARCHAR;
+            case "INTEGER", "INT" -> Types.INTEGER;
+            case "DOUBLE", "NUMBER" -> Types.DOUBLE;
+            case "DATE" -> Types.DATE;
+            case "TIMESTAMP" -> Types.TIMESTAMP;
+            case "BOOLEAN" -> Types.BOOLEAN;
+            default -> Types.OTHER;
+        };
+    }
+
 }

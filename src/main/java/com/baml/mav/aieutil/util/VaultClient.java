@@ -32,36 +32,31 @@ public final class VaultClient {
                 .build();
     }
 
-    // Main method: fetch password using just user (looks up vault params from
-    // vaults.json)
     public String fetchOraclePassword(String user) {
         logger.info("Fetching Oracle password for user: {}", user);
 
         try {
-            // Look up vault parameters from vaults.json
+
             Map<String, Object> params = getVaultParamsForUser(user);
             if (params.isEmpty()) {
                 logger.warn("No vault entry found for user: {}", user);
-                return null; // Return null to trigger password prompt
+                return null;
             }
 
-            // Extract vault parameters
             String vaultBaseUrl = (String) params.get("base-url");
             String roleId = (String) params.get("role-id");
             String secretId = (String) params.get("secret-id");
             String ait = (String) params.get("ait");
             String dbName = (String) params.get("db");
 
-            // Fetch password using the found parameters
             return fetchOraclePassword(vaultBaseUrl, roleId, secretId, dbName, ait, user);
 
         } catch (Exception e) {
             logger.error("Failed to fetch Oracle password for user: {}", user, e);
-            return null; // Return null to trigger password prompt
+            return null;
         }
     }
 
-    // Legacy method: fetch password with explicit parameters
     public String fetchOraclePassword(String vaultBaseUrl, String roleId, String secretId, String dbName, String ait,
             String username) {
         logger.info("Fetching Oracle password for database: {}, AIT: {}, username: {}", dbName, ait, username);
@@ -79,7 +74,6 @@ public final class VaultClient {
         }
     }
 
-    // Static method to get vault parameters by user id from vaults.json
     public static Map<String, Object> getVaultParamsForUser(String user) {
         YamlConfig config = new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
         Object vaultsObj = config.getAll().get("vaults");
