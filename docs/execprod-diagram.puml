@@ -1,0 +1,107 @@
+@startuml ExecProcCmd_Complete_Flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 10
+skinparam activity {
+    BackgroundColor #E8F4FD
+    BorderColor #1976D2
+    FontColor #000000
+}
+skinparam note {
+    BackgroundColor #FFF3E0
+    BorderColor #F57C00
+}
+
+title Complete Flow: ExecProcCmd Execution with Authentication & Database Connection
+
+|#LightBlue|Main Flow|
+start
+:User executes: exec-proc -u username -d database -p procedure;
+note right: Entry Point
+
+:ExecProcCmd.call();
+:Validate required parameters (user, database);
+
+if (Parameters valid?) then (no)
+  :Return error code 1;
+  stop
+endif
+
+|#LightGreen|Password Resolution|
+:resolvePassword();
+
+if (hasDirectVaultParams()?) then (yes)
+  note left: Direct vault parameters provided
+  :VaultClient.fetchOraclePassword(\nvaultUrl, roleId, secretId, database, ait, user);
+  |#Yellow|Vault Authentication|
+  :Build full Vault URL (https://vault-lle.bankofamerica.com);
+  :Create auth request with role-id/secret-id;
+  :POST /v1/auth/approle/login;
+  :Extract client_token from response;
+  :GET /v1/secrets/database/oracle/static-creds/{dbName}-{ait}-{username};
+  :Return Oracle password;
+  |#LightGreen|Password Resolution|
+else (no)
+  :VaultClient.getVaultParamsForUser(user);
+  note right: Search vaults.json for user config
+  
+  if (vaultParams found?) then (yes)
+    :VaultClient.fetchOraclePassword(user);
+    |#Yellow|Vault Authentication|
+    :Load vault config from vaults.json;
+    :Extract role-id, secret-id, base-url;
+    :Build full Vault URL (https://vault-lle.bankofamerica.com);
+    :Create auth request;
+    :POST /v1/auth/approle/login;
+    :Extract client_token;
+    :GET /v1/secrets/database/oracle/static-creds/{dbName}-{ait}-{username};
+    :Return Oracle password;
+    |#LightGreen|Password Resolution|
+  else (no)
+    :promptForPassword();
+    note right: Manual password entry fallback
+    :Read password from console;
+  endif
+endif
+
+|#LightCyan|Connection Management|
+:ConnectionManager.createConnection(\ntype, database, user, password, null);
+
+:Generate LDAP connection string;
+note right: Build Oracle LDAP URL for production database
+
+:Create ConnectionInfo object;
+:url = jdbc:oracle:thin@ldap://oid1puser.bankofamerica...);
+:user = resolved username;
+:password = resolved password;
+
+|#LightBlue|Main Flow|
+if (procedure specified?) then (yes)
+  |#Pink|Procedure Execution|
+  :executeProcedure(password);
+  :ProcedureExecutor.executeProcedureWithStrings(\nprocedure, input, output);
+  
+  |#Lavender|Database Operations|
+  :DriverManager.getConnection(\nconnInfo.url(), connInfo.user(), connInfo.password());
+  :Parse procedure name and parameters;
+  :Create CallableStatement;
+  :Set input parameters;
+  :Register output parameters;
+  :Execute stored procedure;
+  :Extract output parameters;
+  :Return result Map<String, Object>;
+  
+  |#Pink|Procedure Execution|
+  if (Single result?) then (yes)
+    :Print single value to console;
+  else (no)
+    :Print key-value pairs to console;
+  endif
+else (no)
+  :Print password resolution success message;
+endif
+
+:Return success code 0;
+stop
+
+@enduml

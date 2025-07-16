@@ -1,0 +1,102 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: exec-proc-scheduled
+  namespace: your-namespace
+  labels:
+    app: exec-proc
+    type: scheduled
+spec:
+  # Run every day at 2 AM
+  schedule: "0 2 * * *"
+  
+  # Keep last 3 successful and 1 failed job
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  # Prevent concurrent executions
+  concurrencyPolicy: Forbid
+  
+  # Start deadline - if job doesn't start within 10 minutes, skip
+  startingDeadlineSeconds: 600
+  
+  jobTemplate:
+    metadata:
+      labels:
+        app: exec-proc
+        type: scheduled
+    spec:
+      # Job cleanup after 1 hour
+      ttlSecondsAfterFinished: 3600
+      backoffLimit: 2
+      
+      template:
+        metadata:
+          labels:
+            app: exec-proc
+            type: scheduled
+        spec:
+          restartPolicy: Never
+          serviceAccountName: exec-proc-sa
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            fsGroup: 0
+          
+          containers:
+          - name: exec-proc
+            image: your-registry/exec-proc:v1.0.0
+            imagePullPolicy: Always
+            
+            # Command and arguments for procedure execution
+            args:
+              - "-t"
+              - "oracle"
+              - "-d"
+              - "EICCMD03"
+              - "-u"
+              - "MAV_T2T_APP"
+              - "MAV_OWNER.TemplateTable.Onehadoop_proc"
+              - "--input"
+              - "in_schema:VARCHAR2:MAV_OWNER,in_src_table_nm:VARCHAR2:CUST_INSGHT_DLY,in_typ_cd:INTEGER:136"
+              - "--output"
+              - "OUT_PARM:VARCHAR2"
+            
+            # Environment variables from Secret
+            envFrom:
+            - secretRef:
+                name: exec-proc-vault-creds
+            
+            # Additional environment for scheduled jobs
+            env:
+            - name: JOB_TYPE
+              value: "scheduled"
+            - name: EXECUTION_TIME
+              value: "$(date -Iseconds)"
+            
+            # Mount configuration files
+            volumeMounts:
+            - name: config-volume
+              mountPath: /app/application.yaml
+              subPath: application.yaml
+            - name: config-volume
+              mountPath: /app/vaults.yaml
+              subPath: vaults.yaml
+            
+            # Resource limits
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            
+            # Timeout for long-running procedures
+            # terminationGracePeriodSeconds: 300
+          
+          volumes:
+          - name: config-volume
+            configMap:
+              name: exec-proc-config 

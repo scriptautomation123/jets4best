@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: exec-proc-sa
+  namespace: your-namespace
+  labels:
+    app: exec-proc
+
+---
+# Note: Minimal RBAC since automountServiceAccountToken: false
+# The pods only need mounted ConfigMaps/Secrets, not API access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: exec-proc-role
+  namespace: your-namespace
+rules: []
+# No rules needed since service account token is not mounted
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: exec-proc-rolebinding
+  namespace: your-namespace
+subjects:
+- kind: ServiceAccount
+  name: exec-proc-sa
+  namespace: your-namespace
+roleRef:
+  kind: Role
+  name: exec-proc-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Security Context Constraint for OpenShift (still needed for security)
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: exec-proc-scc
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 1
+    max: 65534
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- ALL
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMin: 1001
+  uidRangeMax: 65534
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+  - min: 1
+    max: 65534
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret 

@@ -1,0 +1,89 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: exec-proc-adhoc
+  namespace: your-namespace
+  labels:
+    app: exec-proc
+    type: adhoc
+spec:
+  # Job will be cleaned up after 24 hours
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: exec-proc
+        type: adhoc
+    spec:
+      restartPolicy: Never
+      serviceAccountName: exec-proc-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 0
+      
+      containers:
+      - name: exec-proc
+        image: your-registry/exec-proc:v1.0.0
+        imagePullPolicy: Always
+        
+        # Command and arguments for procedure execution
+        args:
+          - "-t"
+          - "oracle"
+          - "-d"
+          - "EICCMD03"
+          - "-u"
+          - "MAV_T2T_APP"
+          - "MAV_OWNER.TemplateTable.Onehadoop_proc"
+          - "--input"
+          - "in_schema:VARCHAR2:MAV_OWNER,in_src_table_nm:VARCHAR2:CUST_INSGHT_DLY,in_typ_cd:INTEGER:136"
+          - "--output"
+          - "OUT_PARM:VARCHAR2"
+        
+        # Environment variables from Secret
+        envFrom:
+        - secretRef:
+            name: exec-proc-vault-creds
+        
+        # Mount configuration files
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/application.yaml
+          subPath: application.yaml
+        - name: config-volume
+          mountPath: /app/vaults.yaml
+          subPath: vaults.yaml
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+            ephemeral-storage: "512Mi"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "1Gi"
+        
+        # Probes for health checking
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep java || exit 1"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+      
+      volumes:
+      - name: config-volume
+        configMap:
+          name: exec-proc-config
+          
+      # Node selection for specific worker nodes if needed
+      # nodeSelector:
+      #   node-type: database-jobs 

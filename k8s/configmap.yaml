@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-proc-config
+  namespace: your-namespace
+data:
+  application.yaml: |
+    databases:
+      oracle:
+        connection-string:
+          ldap:
+            template: "jdbc:oracle:thin:@ldap://%s:%d/%s,%s"
+            servers: "ldap1.company.com,ldap2.company.com"
+            port: 389
+            context: "cn=OracleContext,dc=company,dc=com"
+          jdbc-thin:
+            template: "jdbc:oracle:thin:@%s:%d:%s"
+            port: 1521
+      h2:
+        connection-string:
+          jdbc-thin:
+            template: "jdbc:h2:%s;MODE=Oracle;DB_CLOSE_DELAY=-1"
+  
+  vaults.yaml: |
+    vaults:
+      - id: "MAV_T2T_APP"
+        base-url: "https://vault.company.com"
+        role-id: "${VAULT_ROLE_ID}"
+        secret-id: "${VAULT_SECRET_ID}"
+        ait: "T2T"
+        db: "EICCMD03" 

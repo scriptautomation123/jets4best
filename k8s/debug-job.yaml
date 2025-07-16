@@ -1,0 +1,175 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: exec-proc-debug
+  namespace: your-namespace
+  labels:
+    app: exec-proc
+    type: debug
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: exec-proc
+        type: debug
+    spec:
+      restartPolicy: Never
+      serviceAccountName: exec-proc-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 0
+      
+      containers:
+      - name: debug
+        image: your-registry/exec-proc:v1.0.0-debug
+        imagePullPolicy: Always
+        
+        # Run debug analysis instead of procedure
+        command: ["sh", "-c"]
+        args:
+          - |
+            echo "🔍 Starting Debug Analysis..."
+            echo "============================="
+            
+            # Run comprehensive debug
+            ./debug/jvm-debug.sh --full
+            
+            echo ""
+            echo "🔧 Running Quick Fix Analysis..."
+            ./debug/quick-fix.sh
+            
+            echo ""
+            echo "🧪 Testing Application..."
+            
+            # Test help command
+            echo "Testing help command:"
+            timeout 30 java $JAVA_OPTS -jar app.jar --help || echo "Help command failed"
+            
+            echo ""
+            echo "Testing procedure execution (dry run):"
+            timeout 60 java $JAVA_OPTS -jar app.jar \
+              -t oracle \
+              -d EICCMD03 \
+              -u MAV_T2T_APP \
+              "MAV_OWNER.TemplateTable.Onehadoop_proc" \
+              --input "in_schema:VARCHAR2:MAV_OWNER,in_src_table_nm:VARCHAR2:CUST_INSGHT_DLY,in_typ_cd:INTEGER:136" \
+              --output "OUT_PARM:VARCHAR2" || echo "Procedure execution failed"
+            
+            echo ""
+            echo "💾 Saving Debug Artifacts..."
+            
+            # Collect all debug files
+            tar -czf /tmp/debug-artifacts.tar.gz \
+              gc.log \
+              app-flight.jfr \
+              heapdump.hprof \
+              /tmp/jvm-debug-*.txt \
+              2>/dev/null || echo "Some artifacts not found"
+            
+            echo "Debug analysis complete. Check logs for details."
+            echo "Artifacts saved to: /tmp/debug-artifacts.tar.gz"
+            
+            # Keep container running for manual inspection
+            echo ""
+            echo "🔬 Debug container will stay alive for 1 hour for manual inspection"
+            echo "Connect with: kubectl exec -it exec-proc-debug -- /bin/bash"
+            sleep 3600
+        
+        # Environment variables from Secret
+        envFrom:
+        - secretRef:
+            name: exec-proc-vault-creds
+        
+        # Debug environment
+        env:
+        - name: DEBUG_MODE
+          value: "true"
+        - name: JAVA_TOOL_OPTIONS
+          value: "-Djava.awt.headless=true"
+        
+        # Mount configuration files
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/application.yaml
+          subPath: application.yaml
+        - name: config-volume
+          mountPath: /app/vaults.yaml
+          subPath: vaults.yaml
+        - name: debug-storage
+          mountPath: /tmp
+        
+        # Higher resource limits for debugging
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            ephemeral-storage: "2Gi"
+      
+      volumes:
+      - name: config-volume
+        configMap:
+          name: exec-proc-config
+      - name: debug-storage
+        emptyDir:
+          sizeLimit: 1Gi
+
+---
+# Service for remote debugging access
+apiVersion: v1
+kind: Service
+metadata:
+  name: exec-proc-debug-svc
+  namespace: your-namespace
+  labels:
+    app: exec-proc
+    type: debug
+spec:
+  selector:
+    app: exec-proc
+    type: debug
+  ports:
+  - name: jdwp
+    port: 5005
+    targetPort: 5005
+    protocol: TCP
+  - name: jmx
+    port: 9999
+    targetPort: 9999
+    protocol: TCP
+  type: ClusterIP
+
+---
+# NetworkPolicy for debug access (optional)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: exec-proc-debug-policy
+  namespace: your-namespace
+spec:
+  podSelector:
+    matchLabels:
+      app: exec-proc
+      type: debug
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: your-namespace
+    ports:
+    - protocol: TCP
+      port: 5005
+    - protocol: TCP
+      port: 9999
+  egress:
+  - {} # Allow all outbound traffic for debugging 

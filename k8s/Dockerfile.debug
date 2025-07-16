@@ -1,0 +1,90 @@
+FROM openjdk:21-jre-slim
+
+# Metadata
+LABEL maintainer="AIE Util Team"
+LABEL description="Debug container for AIE Util CLI with comprehensive debugging tools"
+LABEL version="1.0.0"
+
+# Install debugging tools and utilities
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    net-tools \
+    procps \
+    htop \
+    tcpdump \
+    strace \
+    lsof \
+    vim-tiny \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create app user for security
+RUN groupadd -r appgroup && useradd -r -u 1001 -g appgroup appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy application artifacts
+COPY target/aieutil-*.jar app.jar
+
+# Copy configuration files (with fallback handling)
+COPY src/main/resources/application.yaml ./
+COPY src/main/resources/vaults.yaml ./
+
+# Create debug directory and copy scripts if they exist
+RUN mkdir -p debug
+COPY debug/ ./debug/
+
+# Create necessary directories for debugging output
+RUN mkdir -p /app/logs /app/dumps /app/profiling
+
+# Set ownership and permissions
+RUN chown -R 1001:appgroup /app && \
+    chmod -R g=u /app && \
+    find /app -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+# Switch to non-root user
+USER 1001
+
+# Environment variables for debugging
+ENV DEBUG_MODE=true
+ENV JFR_DURATION=300s
+ENV JFR_FILENAME=/app/profiling/app-flight.jfr
+ENV HEAP_DUMP_PATH=/app/dumps/heapdump.hprof
+ENV GC_LOG_PATH=/app/logs/gc.log
+ENV JMX_PORT=9999
+ENV DEBUG_PORT=5005
+
+# Flexible JVM debugging options
+ENV JAVA_OPTS="-XX:+UnlockExperimentalVMOptions \
+    -XX:+UseZGC \
+    -XX:+FlightRecorder \
+    -XX:StartFlightRecording=duration=${JFR_DURATION},filename=${JFR_FILENAME} \
+    -XX:+HeapDumpOnOutOfMemoryError \
+    -XX:HeapDumpPath=${HEAP_DUMP_PATH} \
+    -Xlog:gc*:${GC_LOG_PATH} \
+    -Dcom.sun.management.jmxremote=true \
+    -Dcom.sun.management.jmxremote.port=${JMX_PORT} \
+    -Dcom.sun.management.jmxremote.authenticate=false \
+    -Dcom.sun.management.jmxremote.ssl=false \
+    -Dcom.sun.management.jmxremote.host=0.0.0.0 \
+    -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${DEBUG_PORT}"
+
+# Health check for the debugging container
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${JMX_PORT} || exit 1
+
+# Expose debugging ports
+EXPOSE ${DEBUG_PORT} ${JMX_PORT}
+
+# Enhanced entry point with debug logging
+ENTRYPOINT ["sh", "-c", "\
+    echo '🔍 Starting AIE Util in DEBUG mode...'; \
+    echo 'Debug port: ${DEBUG_PORT}'; \
+    echo 'JMX port: ${JMX_PORT}'; \
+    echo 'JFR output: ${JFR_FILENAME}'; \
+    echo 'Heap dump path: ${HEAP_DUMP_PATH}'; \
+    echo 'GC log: ${GC_LOG_PATH}'; \
+    echo ''; \
+    exec java $JAVA_OPTS -jar app.jar \"$@\"", "--"] 

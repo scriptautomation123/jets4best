@@ -32,6 +32,20 @@ public final class VaultClient {
                 .build();
     }
 
+    private String buildVaultBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            throw new ExceptionUtils.ConfigurationException("Base URL cannot be null or empty");
+        }
+        
+        // If it already contains protocol, return as-is
+        if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
+            return baseUrl;
+        }
+        
+        // Build the full URL with bankofamerica.com domain
+        return String.format("https://%s.bankofamerica.com", baseUrl);
+    }
+
     public String fetchOraclePassword(String user) {
         logger.info("Fetching Oracle password for user: {}", user);
 
@@ -62,9 +76,12 @@ public final class VaultClient {
         logger.info("Fetching Oracle password for database: {}, AIT: {}, username: {}", dbName, ait, username);
 
         try {
+            // Parse and format the base URL
+            String fullVaultUrl = buildVaultBaseUrl(vaultBaseUrl);
+            logger.info("Using Vault URL: {}", fullVaultUrl);
 
-            String clientToken = authenticateToVault(vaultBaseUrl, roleId, secretId);
-            String oraclePasswordResponse = fetchOraclePasswordSync(vaultBaseUrl, clientToken, dbName, ait, username);
+            String clientToken = authenticateToVault(fullVaultUrl, roleId, secretId);
+            String oraclePasswordResponse = fetchOraclePasswordSync(fullVaultUrl, clientToken, dbName, ait, username);
             return parsePasswordFromResponse(oraclePasswordResponse);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -121,7 +138,7 @@ public final class VaultClient {
     private String fetchOraclePasswordSync(String vaultBaseUrl, String clientToken, String dbName, String ait,
             String username) throws IOException, InterruptedException {
         String secretPath = String.format("%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
-                vaultBaseUrl, ait, dbName, username).toLowerCase();
+                vaultBaseUrl, dbName, ait, username).toLowerCase();
 
         logger.info("[DEBUG] Oracle password URL: {}", secretPath);
         return httpGet(secretPath, Map.of("x-vault-token", clientToken));
@@ -195,3 +212,5 @@ public final class VaultClient {
         }
     }
 }
+
+

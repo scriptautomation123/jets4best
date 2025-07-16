@@ -144,6 +144,7 @@
                 <configuration>
                     <release>${maven.compiler.release}</release>
                     <compilerArgs>
+                         <arg>--enable-preview</arg>
                         <arg>-proc:none</arg>
                     </compilerArgs>
                 </configuration>
@@ -215,6 +216,7 @@
                             </arguments>
                         </configuration>
                     </execution>
+    
                 </executions>
             </plugin>
             <!-- 3. use jdeps and jlink to generate a custom jre-->
@@ -238,6 +240,8 @@
                     </execution>
                 </executions>
             </plugin>
+
+
 
         </plugins>
     </build>

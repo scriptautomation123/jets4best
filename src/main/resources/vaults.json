@@ -1,0 +1,12 @@
+
+{
+  "vaults": [
+    {
+      "id": "MAV_T2T_APP",
+      "base-url": "http://localhost:8200",
+      "role-id": "eef42f8f-5a28-05d9-f373-925fb9187a1a",
+      "secret-id": "1dbebbe8-51d4-9827-5d93-44db91b23472",
+      "ait": "76455654"
+    }
+  ]
+}
