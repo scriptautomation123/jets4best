@@ -62,6 +62,7 @@ public final class VaultClient {
         logger.info("Fetching Oracle password for database: {}, AIT: {}, username: {}", dbName, ait, username);
 
         try {
+
             String clientToken = authenticateToVault(vaultBaseUrl, roleId, secretId);
             String oraclePasswordResponse = fetchOraclePasswordSync(vaultBaseUrl, clientToken, dbName, ait, username);
             return parsePasswordFromResponse(oraclePasswordResponse);
