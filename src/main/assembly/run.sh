@@ -10,19 +10,40 @@ find_jar_file() {
     find "$dir" -maxdepth 1 -name "aieutil-*.jar" 2>/dev/null | head -1
 }
 
-    JAR_FILE="$(find_jar_file "$BUNDLE_DIR")"
+JAR_FILE="$(find_jar_file "$BUNDLE_DIR")"
 if [ ! -f "$JAR_FILE" ]; then
     echo "Error: No aieutil-*.jar found in bundle directory"
     exit 1
 fi
 
 JRE_DIR="$BUNDLE_DIR/jre"
-JAVA_CMD="java"
 if [ -d "$JRE_DIR" ] && [ -x "$JRE_DIR/bin/java" ]; then
     JAVA_CMD="$JRE_DIR/bin/java"
-    echo "Using bundled JRE: $JRE_DIR"
+    JAVA_TYPE="bundled"
 else
-    echo "Using system Java"
+    if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+        JAVA_CMD="$JAVA_HOME/bin/java"
+        JAVA_TYPE="JAVA_HOME"
+    else
+        JAVA_CMD="java"
+        JAVA_TYPE="system"
+    fi
+fi
+
+JAVA_VERSION=$("$JAVA_CMD" -version 2>&1 | awk -F[\".] '/version/ {print $2}')
+if [ "$JAVA_TYPE" = "bundled" ]; then
+    echo "✅ Using bundled JRE: $JRE_DIR"
+elif [ "$JAVA_TYPE" = "JAVA_HOME" ]; then
+    echo "✅ Using JAVA_HOME: $JAVA_HOME"
+else
+    echo "⚠️  Using system Java"
+fi
+
+if [ "$JAVA_VERSION" = "8" ] || [ "$JAVA_VERSION" = "21" ]; then
+    echo "Java version: $("$JAVA_CMD" -version 2>&1 | head -n 1)"
+else
+    echo "⚠️  Warning: Detected Java version is not 8 or 21!"
+    "$JAVA_CMD" -version
 fi
 
 JAVA_OPTS="-Dfile.encoding=UTF-8"
