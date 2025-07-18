@@ -1,9 +1,9 @@
 package com.baml.mav.aieutil;
 
 import java.sql.DriverManager;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.stream.Stream;
 
 import org.apache.logging.log4j.Logger;
 
@@ -91,10 +91,11 @@ public class ExecProcCmd implements Callable<Integer> {
 
     private void executeProcedure(String password) {
         try {
-            ConnectionManager.ConnectionInfo connInfo = ConnectionManager.createConnection(type, database, user, password, null);
+            ConnectionManager.ConnInfo connInfo = ConnectionManager.createConnection(type, database, user, password,
+                    null);
 
             Map<String, Object> result = new ProcedureExecutor(
-                    () -> DriverManager.getConnection(connInfo.url(), connInfo.user(), connInfo.password()))
+                    () -> DriverManager.getConnection(connInfo.getUrl(), connInfo.getUser(), connInfo.getPassword()))
                     .executeProcedureWithStrings(procedure, input, output);
 
             if (result.size() == 1) {
@@ -127,7 +128,8 @@ public class ExecProcCmd implements Callable<Integer> {
     }
 
     private boolean hasDirectVaultParams() {
-        return Stream.of(vaultUrl, roleId, secretId, ait)
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+                .stream()
                 .allMatch(param -> param != null && !param.trim().isEmpty());
     }
 

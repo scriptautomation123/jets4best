@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,8 @@ public class SqlExecutor {
         private final int updateCount;
         private final boolean isResultSet;
 
-        public SqlResult(List<Map<String, Object>> rows, ResultSetMetaData metaData, int updateCount, boolean isResultSet) {
+        public SqlResult(List<Map<String, Object>> rows, ResultSetMetaData metaData, int updateCount,
+                boolean isResultSet) {
             if (isResultSet && rows == null) {
                 throw new IllegalArgumentException("Rows cannot be null for result sets");
             }
@@ -70,15 +72,15 @@ public class SqlExecutor {
 
         public List<String> getColumnNames() {
             if (metaData == null)
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             try {
-                List<String> names = new java.util.ArrayList<String>();
+                List<String> names = new ArrayList<>();
                 for (int i = 1; i <= metaData.getColumnCount(); i++) {
                     names.add(metaData.getColumnName(i));
                 }
                 return names;
             } catch (Exception e) {
-                return java.util.Collections.emptyList();
+                return Collections.emptyList();
             }
         }
     }
@@ -127,7 +129,7 @@ public class SqlExecutor {
             if (!sql.trim().isEmpty()) {
                 log.info("Script Statement: {}", sql);
                 try {
-                    resultHandler.accept(executeSql(sql, new ArrayList<Object>()));
+                    resultHandler.accept(executeSql(sql, new ArrayList<>()));
                 } catch (Exception e) {
                     ExceptionUtils.logAndRethrow(e, "Failed to execute SQL statement in script: " + sql);
                 }

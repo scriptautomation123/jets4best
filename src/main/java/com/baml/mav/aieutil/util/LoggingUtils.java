@@ -52,7 +52,7 @@ public final class LoggingUtils {
     }
 
     public static void configureMinimalConsoleLogging() {
-        Configurator.setRootLevel(org.apache.logging.log4j.Level.ERROR);
-        Configurator.setLevel("com.baml.mav.jdbcsqlrunner", org.apache.logging.log4j.Level.DEBUG);
+        Configurator.setRootLevel(Level.ERROR);
+        Configurator.setLevel("com.baml.mav.jdbcsqlrunner", Level.DEBUG);
     }
 }

@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 
 public class JlinkHelper {
     public static void main(String[] args) throws IOException, InterruptedException {
@@ -81,7 +82,7 @@ public class JlinkHelper {
     }
 
     private static long calculateDirectorySize(Path dir) throws IOException {
-        try (var stream = Files.walk(dir)) {
+        try (Stream<Path> stream = Files.walk(dir)) {
             return stream
                     .filter(Files::isRegularFile)
                     .mapToLong(path -> {

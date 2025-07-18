@@ -9,11 +9,6 @@
     <baseDirectory>${project.artifactId}-${project.version}</baseDirectory>
 
     <fileSets>
-        <!-- 1. Copy the custom JRE created by jlink -->
-        <fileSet>
-            <directory>${project.build.directory}/jre</directory>
-            <outputDirectory>jre</outputDirectory>
-        </fileSet>
 
         <!-- 2. Copy the shaded JAR (with-dependencies) at the top level -->
         <fileSet>

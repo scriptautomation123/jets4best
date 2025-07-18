@@ -8,7 +8,8 @@
     <name>AIE Util CLI</name>
     <description>Minimal Oracle CLI utility</description>
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <log4j2.version>2.25.0</log4j2.version>
         <jackson.version>2.15.3</jackson.version>
@@ -18,6 +19,7 @@
         <exec.plugin.version>3.5.1</exec.plugin.version>
         <assembly.plugin.version>3.7.1</assembly.plugin.version>
         <picocli.version>4.7.1</picocli.version>
+        <httpclient.version>4.5.14</httpclient.version>
     </properties>
 
     <!-- Centralized dependency versions -->
@@ -63,6 +65,12 @@
                 <artifactId>picocli</artifactId>
                 <version>${picocli.version}</version>
             </dependency>
+            <!-- Apache HttpClient -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>${httpclient.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
@@ -101,6 +109,10 @@
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+        </dependency>
     </dependencies>
     <!-- Centralized plugin versions -->
     <build>
@@ -138,9 +150,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <release>${maven.compiler.release}</release>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
                     <compilerArgs>
-                         <arg>--enable-preview</arg>
                         <arg>-proc:none</arg>
                     </compilerArgs>
                 </configuration>
@@ -180,37 +192,13 @@
                                     <mainClass>com.baml.mav.aieutil.ExecProcCmd</mainClass>
                                 </transformer>
                                 <transformer
-                                    implementation="org.apache.logging.log4j.core.tools.plugin.PluginCacheFileTransformer" />
+                                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                             </transformers>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- 2. fat jar + custom jre to a zip file-->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>${exec.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>run-jlink-helper</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>java</goal>
-                        </goals>
-                        <configuration>
-                            <mainClass>com.baml.mav.aieutil.buildhelpers.JlinkHelper</mainClass>
-                            <arguments>
-                                <argument>
-                                    ${project.build.directory}/${project.build.finalName}.jar</argument>
-                                <argument>${env.JAVA_HOME}/jmods</argument>
-                                <argument>${project.build.directory}/jre</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <!-- 3. use jdeps and jlink to generate a custom jre-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -280,6 +268,28 @@
                                 </goals>
                             </execution>
                         </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>java21</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.release>21</maven.compiler.release>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <release>21</release>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>

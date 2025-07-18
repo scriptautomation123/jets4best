@@ -1,16 +1,21 @@
 package com.baml.mav.aieutil.util;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.Logger;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public final class VaultClient {
@@ -22,26 +27,20 @@ public final class VaultClient {
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
-        this.client = createDefaultClient();
+        this.client = HttpClients.createDefault();
         logger.debug("VaultClient initialized");
-    }
-
-    private HttpClient createDefaultClient() {
-        return HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
     }
 
     private String buildVaultBaseUrl(String baseUrl) {
         if (baseUrl == null || baseUrl.isEmpty()) {
             throw new ExceptionUtils.ConfigurationException("Base URL cannot be null or empty");
         }
-        
+
         // If it already contains protocol, return as-is
         if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
             return baseUrl;
         }
-        
+
         // Build the full URL with bankofamerica.com domain
         return String.format("https://%s.bankofamerica.com", baseUrl);
     }
@@ -83,9 +82,6 @@ public final class VaultClient {
             String clientToken = authenticateToVault(fullVaultUrl, roleId, secretId);
             String oraclePasswordResponse = fetchOraclePasswordSync(fullVaultUrl, clientToken, dbName, ait, username);
             return parsePasswordFromResponse(oraclePasswordResponse);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new ExceptionUtils.ConfigurationException("Thread interrupted while fetching Oracle password", e);
         } catch (Exception e) {
             logger.error("Failed to fetch Oracle password", e);
             throw new ExceptionUtils.ConfigurationException("Failed to fetch Oracle password", e);
@@ -95,7 +91,8 @@ public final class VaultClient {
     public static Map<String, Object> getVaultParamsForUser(String user) {
         YamlConfig config = new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
         Object vaultsObj = config.getAll().get("vaults");
-        if (vaultsObj instanceof java.util.List<?> vaultsList) {
+        if (vaultsObj instanceof List<?>) {
+            List<?> vaultsList = (List<?>) vaultsObj;
             for (Object entry : vaultsList) {
                 Map<String, Object> result = tryGetVaultEntry(entry, user);
                 if (!result.isEmpty()) {
@@ -108,7 +105,8 @@ public final class VaultClient {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> tryGetVaultEntry(Object entry, String user) {
-        if (entry instanceof Map<?, ?> map) {
+        if (entry instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) entry;
             Object entryId = map.get("id");
             if (entryId != null && entryId.toString().equals(user)) {
                 boolean allStringKeys = map.keySet().stream().allMatch(String.class::isInstance);
@@ -121,12 +119,14 @@ public final class VaultClient {
     }
 
     private String authenticateToVault(String vaultBaseUrl, String roleId, String secretId)
-            throws IOException, InterruptedException {
+            throws IOException {
         String authUrl = vaultBaseUrl + "/v1/auth/approle/login";
         String authBody = String.format("{\"role_id\":\"%s\",\"secret_id\":\"%s\"}", roleId, secretId);
 
         logger.info("[DEBUG] Vault token URL: {}", authUrl);
-        String response = httpPost(authUrl, authBody, Map.of("Content-Type", "application/json"));
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        String response = httpPost(authUrl, authBody, headers);
 
         String clientToken = parseJsonField(response, CLIENT_TOKEN_PATH);
         if (clientToken == null || clientToken.isEmpty()) {
@@ -136,50 +136,58 @@ public final class VaultClient {
     }
 
     private String fetchOraclePasswordSync(String vaultBaseUrl, String clientToken, String dbName, String ait,
-            String username) throws IOException, InterruptedException {
+            String username) throws IOException {
         String secretPath = String.format("%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
                 vaultBaseUrl, dbName, ait, username).toLowerCase();
 
         logger.info("[DEBUG] Oracle password URL: {}", secretPath);
-        return httpGet(secretPath, Map.of("x-vault-token", clientToken));
+        Map<String, String> headers = new HashMap<>();
+        headers.put("x-vault-token", clientToken);
+        return httpGet(secretPath, headers);
     }
 
-    private String httpGet(String url, Map<String, String> headers) throws IOException, InterruptedException {
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(30));
+    private String httpGet(String url, Map<String, String> headers) throws IOException {
+        HttpGet request = new HttpGet(url);
 
-        headers.forEach(requestBuilder::header);
-
-        HttpRequest request = requestBuilder.build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() >= 400) {
-            throw new ExceptionUtils.ConfigurationException(
-                    "HTTP GET failed: " + response.statusCode() + " - " + response.body());
+        // Add headers
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            request.addHeader(header.getKey(), header.getValue());
         }
 
-        return response.body();
+        HttpResponse response = client.execute(request);
+        int statusCode = response.getStatusLine().getStatusCode();
+
+        if (statusCode >= 400) {
+            String responseBody = EntityUtils.toString(response.getEntity());
+            throw new ExceptionUtils.ConfigurationException(
+                    "HTTP GET failed: " + statusCode + " - " + responseBody);
+        }
+
+        return EntityUtils.toString(response.getEntity());
     }
 
     private String httpPost(String url, String body, Map<String, String> headers)
-            throws IOException, InterruptedException {
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .timeout(Duration.ofSeconds(30));
+            throws IOException {
+        HttpPost request = new HttpPost(url);
 
-        headers.forEach(requestBuilder::header);
-
-        HttpRequest request = requestBuilder.build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() >= 400) {
-            throw new ExceptionUtils.ConfigurationException(
-                    "HTTP POST failed: " + response.statusCode() + " - " + response.body());
+        // Add headers
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            request.addHeader(header.getKey(), header.getValue());
         }
 
-        return response.body();
+        // Set request body
+        request.setEntity(new StringEntity(body, "UTF-8"));
+
+        HttpResponse response = client.execute(request);
+        int statusCode = response.getStatusLine().getStatusCode();
+
+        if (statusCode >= 400) {
+            String responseBody = EntityUtils.toString(response.getEntity());
+            throw new ExceptionUtils.ConfigurationException(
+                    "HTTP POST failed: " + statusCode + " - " + responseBody);
+        }
+
+        return EntityUtils.toString(response.getEntity());
     }
 
     private String parsePasswordFromResponse(String secretResponseBody) {
@@ -197,7 +205,7 @@ public final class VaultClient {
     private String parseJsonField(String json, String path) {
         try {
             String[] parts = path.split("/");
-            var node = mapper.readTree(json);
+            JsonNode node = mapper.readTree(json);
             for (String part : parts) {
                 if (part.isEmpty())
                     continue;
@@ -212,5 +220,3 @@ public final class VaultClient {
         }
     }
 }
-
-
