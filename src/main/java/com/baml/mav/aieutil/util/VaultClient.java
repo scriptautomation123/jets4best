@@ -26,6 +26,7 @@ public final class VaultClient {
 
     private final HttpClient client;
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
+    private static final Logger staticLogger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
         // Configure timeouts for fast failure
@@ -116,7 +117,10 @@ public final class VaultClient {
     }
 
     public static Map<String, Object> getVaultParamsForUser(String user, String database) {
-        YamlConfig config = new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
+        String vaultConfigPath = System.getProperty("vault.config", "vaults.yaml");
+        staticLogger.info("Loading vault config from: {}", vaultConfigPath);
+
+        YamlConfig config = new YamlConfig(vaultConfigPath);
         Object vaultsObj = config.getAll().get("vaults");
         if (vaultsObj instanceof List<?>) {
             List<?> vaultsList = (List<?>) vaultsObj;
