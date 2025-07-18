@@ -6,62 +6,11 @@ databases:
         port: 49125
       ldap:
         template: "ldap://%s:%d/%s,%s"
-        servers: localhost,localhost,localhost
+        servers: "oid1puser.bankofamerica.com,oid2puser.bankofamerica.com,oid3puser.bankofamerica.com"
         context: "cn=oracleContext,dc=bankofamerica,dc=com"
-        port: 1389
-        # Production servers (commented out for local dev)
-        # servers: oid1puser.bankofamerica.com,oid2puser.bankofamerica.com,oid3puser.bankofamerica.com
-        # port: 389
+        port: 389
   h2:
     connection-string:
       jdbc-thin:
         template: "jdbc:h2:%s;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
         port: 0
-
-# Oracle Database Configuration
-oracle:
-  host: localhost
-  port: 1521
-  service: XE
-  username: system
-  password: oracle123
-  
-# Connection pool settings
-  connection:
-    pool:
-      initial-size: 5
-      max-size: 20
-      min-idle: 5
-      max-idle: 10
-      timeout: 30000
-
-# Mock Driver Configuration
-mock:
-  driver:
-    enabled: true  # Set to false for production
-    ldap:
-      enabled: true
-      # Mock LDAP to local database mappings
-      services:
-        ECICMD03_SVC01:
-          host: localhost
-          port: 1522
-          service: XE
-        ORACLE_SVC01:
-          host: localhost
-          port: 1521
-          service: XE
-    # Override connection behavior in development
-    force-local: true
-    log-redirections: true
-
-# Environment profiles
-profiles:
-  active: development  # Can be: development, staging, production
-
-# Logging configuration
-logging:
-  level:
-    com.baml.mav.aieutil: DEBUG
-    oracle: INFO
-    mock: DEBUG
