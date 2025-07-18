@@ -26,6 +26,7 @@ public final class VaultClient {
 
     private final HttpClient client;
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
+    // its right here
     private static final Logger staticLogger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
