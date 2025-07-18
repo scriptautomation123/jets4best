@@ -1,10 +1,11 @@
 package com.baml.mav.aieutil.util;
 
 import java.io.File;
-import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -20,19 +21,19 @@ public class YamlConfig {
     private Map<String, Object> loadConfig(String path) {
         try {
             ObjectMapper yaml = new ObjectMapper(new YAMLFactory());
-            InputStream in = getClass().getClassLoader().getResourceAsStream(path);
-            if (in != null) {
-                return yaml.readValue(in, Map.class);
-            } else {
-                return yaml.readValue(new File(path), Map.class);
-            }
+
+            // Only load from file system, never from classpath
+            File configFile = new File(path);
+            Logger logger = LoggingUtils.getLogger(YamlConfig.class);
+            logger.info("Loading config from file system: {}", configFile.getAbsolutePath());
+
+            return yaml.readValue(configFile, Map.class);
         } catch (Exception e) {
             throw ExceptionUtils.wrap(
                     e,
                     "Could not find configuration file: " + path + "\n" +
-                            "• If running from your IDE, ensure " + path + " is in src/main/resources.\n" +
-                            "• If running as a fat jar, ensure " + path
-                            + " is in the same directory as the jar or specify -Dconfig.file/-Dvault.config.\n" +
+                            "• Ensure " + path + " exists in the file system.\n" +
+                            "• Specify the correct path with -Dvault.config=/path/to/vaults.yaml\n" +
                             "Original error: " + e.getMessage());
         }
     }
