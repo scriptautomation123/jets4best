@@ -1,0 +1,65 @@
+{
+  "name": "Oracle + Vault Dev Environment",
+  "dockerComposeFile": "docker-compose.yaml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspaces/jets4best",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installMaven": "true"
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y jq && chmod +x ./.devcontainer/start-containers.sh && ./.devcontainer/start-containers.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.java",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-maven",
+        "ms-azuretools.vscode-docker",
+        "michelemelluso.gitignore",
+        "rhalaly.scope-to-this",
+        "redhat.vscode-xml",
+        "ms-azuretools.vscode-containers",
+        "GitHub.codespaces",
+        "Sycl.markdown-command-runner",
+        "hancel.markdown-image-editor",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ]
+    }
+  },
+  "forwardPorts": [
+    1521,
+    5500,
+    8200,
+    8080
+  ],
+  "portsAttributes": {
+    "1521": {
+      "label": "Oracle Database",
+      "onAutoForward": "notify"
+    },
+    "5500": {
+      "label": "Oracle Enterprise Manager",
+      "onAutoForward": "notify"
+    },
+    "8200": {
+      "label": "Vault",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "PlantUML",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "64gb"
+  }
+}

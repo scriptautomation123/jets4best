@@ -67,7 +67,7 @@ public class ExecProcCmd implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        if (user == null || user.isBlank() || database == null || database.isBlank()) {
+        if (user == null || user.trim().isEmpty() || database == null || database.trim().isEmpty()) {
             spec.commandLine().getErr().println("[ERROR] --user and --database are required");
             return 1;
         }
@@ -75,7 +75,7 @@ public class ExecProcCmd implements Callable<Integer> {
         try {
             String password = resolvePassword();
 
-            if (procedure != null && !procedure.isBlank()) {
+            if (procedure != null && !procedure.trim().isEmpty()) {
                 executeProcedure(password);
             } else {
                 spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
@@ -91,7 +91,7 @@ public class ExecProcCmd implements Callable<Integer> {
 
     private void executeProcedure(String password) {
         try {
-            var connInfo = ConnectionManager.createConnection(type, database, user, password, null);
+            ConnectionManager.ConnectionInfo connInfo = ConnectionManager.createConnection(type, database, user, password, null);
 
             Map<String, Object> result = new ProcedureExecutor(
                     () -> DriverManager.getConnection(connInfo.url(), connInfo.user(), connInfo.password()))
@@ -128,7 +128,7 @@ public class ExecProcCmd implements Callable<Integer> {
 
     private boolean hasDirectVaultParams() {
         return Stream.of(vaultUrl, roleId, secretId, ait)
-                .allMatch(param -> param != null && !param.isBlank());
+                .allMatch(param -> param != null && !param.trim().isEmpty());
     }
 
     private String promptForPassword() {

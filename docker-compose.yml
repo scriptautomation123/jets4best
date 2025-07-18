@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    container_name: jets4best-devcontainer
+    volumes:
+      - ../:/workspaces/jets4best:cached
+    command: /bin/sh -c "while sleep 1000; do :; done"
+    environment:
+      - ORACLE_PWD=${ORACLE_PWD}
+      - ORACLE_CHARACTERSET=AL32UTF8
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_DEV_ROOT_TOKEN_ID}
+    depends_on:
+      - oracle-db
+      - vault
+      - plantuml
+
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    container_name: oracle-xe
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      - ORACLE_PWD=${ORACLE_PWD:-Oracle123}
+      - ORACLE_CHARACTERSET=AL32UTF8
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "sys/$$ORACLE_PWD@//localhost:1521/XE as sysdba", "@/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  vault:
+    image: vault:latest
+    container_name: vault-dev
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_DEV_ROOT_TOKEN_ID:-myroot}
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    command: vault server -dev -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID:-myroot}
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  plantuml:
+    image: plantuml/plantuml-server:jetty
+    container_name: plantuml-server
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-Djava.awt.headless=true -Dfile.encoding=UTF-8
+    volumes:
+      - font_data:/usr/share/fonts
+    restart: unless-stopped
+    depends_on:
+      - font-installer
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/plantuml/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  font-installer:
+    image: ubuntu:22.04
+    container_name: font-installer
+    volumes:
+      - font_data:/usr/share/fonts
+    command: >
+      bash -c "
+        apt-get update && 
+        apt-get install -y libfreetype6 libfontconfig1 fonts-dejavu-core fontconfig libfreetype6-dev fonts-liberation fonts-noto && 
+        fc-cache -fv && 
+        echo 'Fonts installed successfully'
+      "
+    restart: "no"
+
+volumes:
+  oracle_data:
+  font_data:

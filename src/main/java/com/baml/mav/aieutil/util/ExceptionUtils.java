@@ -37,13 +37,19 @@ public final class ExceptionUtils {
             return "OP_QUERY";
         }
 
-        return switch (sqlState.substring(0, 2)) {
-            case "08" -> "CONN_FAILED"; // Connection errors
-            case "42" -> "SYNTAX_ERROR"; // Syntax errors
-            case "23" -> "CONSTRAINT_VIOLATION"; // Constraint violations
-            case "22" -> "DATA_ERROR"; // Data errors
-            default -> "OP_QUERY"; // Default
-        };
+        String sqlStatePrefix = sqlState.substring(0, 2);
+        switch (sqlStatePrefix) {
+            case "08":
+                return "CONN_FAILED"; // Connection errors
+            case "42":
+                return "SYNTAX_ERROR"; // Syntax errors
+            case "23":
+                return "CONSTRAINT_VIOLATION"; // Constraint violations
+            case "22":
+                return "DATA_ERROR"; // Data errors
+            default:
+                return "OP_QUERY"; // Default
+        }
     }
 
     public static class CliUsageException extends RuntimeException {

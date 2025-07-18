@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.Logger;
 
@@ -20,7 +21,29 @@ import com.baml.mav.aieutil.util.LoggingUtils;
 
 public class ProcedureExecutor {
 
-    public record ProcedureParam(String name, String type, Object value) {
+    public static class ProcedureParam {
+        private final String name;
+        private final String type;
+        private final Object value;
+
+        public ProcedureParam(String name, String type, Object value) {
+            this.name = name;
+            this.type = type;
+            this.value = value;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public String type() {
+            return type;
+        }
+
+        public Object value() {
+            return value;
+        }
+
         public static ProcedureParam fromString(String input) {
             String[] parts = input.split(":");
             if (parts.length != 3) {
@@ -30,12 +53,19 @@ public class ProcedureExecutor {
         }
 
         public Object getTypedValue() {
-            return switch (type.toUpperCase()) {
-                case "NUMBER", "INTEGER", "INT" -> Integer.parseInt(value.toString());
-                case "DOUBLE" -> Double.parseDouble(value.toString());
-                case "BOOLEAN" -> Boolean.parseBoolean(value.toString());
-                default -> value;
-            };
+            String typeUpper = type.toUpperCase();
+            switch (typeUpper) {
+                case "NUMBER":
+                case "INTEGER":
+                case "INT":
+                    return Integer.parseInt(value.toString());
+                case "DOUBLE":
+                    return Double.parseDouble(value.toString());
+                case "BOOLEAN":
+                    return Boolean.parseBoolean(value.toString());
+                default:
+                    return value;
+            }
         }
     }
 
@@ -88,7 +118,7 @@ public class ProcedureExecutor {
                             .map(Object::toString)
                             .filter(str -> str.contains(":"))
                             .map(ProcedureParam::fromString)
-                            .toList())
+                            .collect(Collectors.toList()))
                     .orElse(Collections.emptyList());
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to parse input parameters");
@@ -101,7 +131,7 @@ public class ProcedureExecutor {
             return Optional.ofNullable(outputParams)
                     .map(params -> params.entrySet().stream()
                             .map(entry -> new ProcedureParam(entry.getKey(), "VARCHAR", null))
-                            .toList())
+                            .collect(Collectors.toList()))
                     .orElse(Collections.emptyList());
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to parse output parameters");
@@ -155,14 +185,14 @@ public class ProcedureExecutor {
     // Parse CLI input parameter strings
     private List<ProcedureParam> parseStringInputParams(String inputParams) {
         try {
-            if (inputParams == null || inputParams.isBlank()) {
+            if (inputParams == null || inputParams.trim().isEmpty()) {
                 return Collections.emptyList();
             }
             return Arrays.stream(inputParams.split(","))
                     .map(String::trim)
                     .filter(s -> s.contains(":"))
                     .map(ProcedureParam::fromString)
-                    .toList();
+                    .collect(Collectors.toList());
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to parse string input parameters");
             throw new IllegalStateException("Unreachable");
@@ -172,7 +202,7 @@ public class ProcedureExecutor {
     // Parse CLI output parameter strings
     private List<ProcedureParam> parseStringOutputParams(String outputParams) {
         try {
-            if (outputParams == null || outputParams.isBlank()) {
+            if (outputParams == null || outputParams.trim().isEmpty()) {
                 return Collections.emptyList();
             }
             return Arrays.stream(outputParams.split(","))
@@ -182,7 +212,7 @@ public class ProcedureExecutor {
                         String[] parts = param.split(":");
                         return new ProcedureParam(parts[0], parts[1], null);
                     })
-                    .toList();
+                    .collect(Collectors.toList());
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to parse string output parameters");
             throw new IllegalStateException("Unreachable");
@@ -191,27 +221,44 @@ public class ProcedureExecutor {
 
     // Modern pattern matching
     private void setParameter(CallableStatement stmt, int index, Object value) throws SQLException {
-        switch (value) {
-            case Integer i -> stmt.setInt(index, i);
-            case Double d -> stmt.setDouble(index, d);
-            case String s -> stmt.setString(index, s);
-            case Boolean b -> stmt.setBoolean(index, b);
-            case null -> stmt.setNull(index, Types.NULL);
-            default -> stmt.setObject(index, value);
+        if (value == null) {
+            stmt.setNull(index, Types.NULL);
+        } else if (value instanceof Integer) {
+            stmt.setInt(index, (Integer) value);
+        } else if (value instanceof Double) {
+            stmt.setDouble(index, (Double) value);
+        } else if (value instanceof String) {
+            stmt.setString(index, (String) value);
+        } else if (value instanceof Boolean) {
+            stmt.setBoolean(index, (Boolean) value);
+        } else {
+            stmt.setObject(index, value);
         }
     }
 
     // Simplified JDBC type mapping
     private int getJdbcType(String type) {
-        return switch (type.toUpperCase()) {
-            case "STRING", "VARCHAR", "VARCHAR2" -> Types.VARCHAR;
-            case "INTEGER", "INT" -> Types.INTEGER;
-            case "DOUBLE", "NUMBER" -> Types.DOUBLE;
-            case "DATE" -> Types.DATE;
-            case "TIMESTAMP" -> Types.TIMESTAMP;
-            case "BOOLEAN" -> Types.BOOLEAN;
-            default -> Types.OTHER;
-        };
+        String typeUpper = type.toUpperCase();
+        switch (typeUpper) {
+            case "STRING":
+            case "VARCHAR":
+            case "VARCHAR2":
+                return Types.VARCHAR;
+            case "INTEGER":
+            case "INT":
+                return Types.INTEGER;
+            case "DOUBLE":
+            case "NUMBER":
+                return Types.DOUBLE;
+            case "DATE":
+                return Types.DATE;
+            case "TIMESTAMP":
+                return Types.TIMESTAMP;
+            case "BOOLEAN":
+                return Types.BOOLEAN;
+            default:
+                return Types.OTHER;
+        }
     }
 
 }

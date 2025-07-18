@@ -17,17 +17,20 @@ import com.baml.mav.aieutil.util.LoggingUtils;
 
 public class SqlExecutor {
 
-    public record SqlResult(
-            List<Map<String, Object>> rows,
-            ResultSetMetaData metaData,
-            int updateCount,
-            boolean isResultSet) {
+    public static class SqlResult {
+        private final List<Map<String, Object>> rows;
+        private final ResultSetMetaData metaData;
+        private final int updateCount;
+        private final boolean isResultSet;
 
-        // Compact constructor for validation
-        public SqlResult {
+        public SqlResult(List<Map<String, Object>> rows, ResultSetMetaData metaData, int updateCount, boolean isResultSet) {
             if (isResultSet && rows == null) {
                 throw new IllegalArgumentException("Rows cannot be null for result sets");
             }
+            this.rows = rows;
+            this.metaData = metaData;
+            this.updateCount = updateCount;
+            this.isResultSet = isResultSet;
         }
 
         // Factory methods for different use cases
@@ -37,6 +40,23 @@ public class SqlExecutor {
 
         public static SqlResult ofUpdateCount(int updateCount) {
             return new SqlResult(null, null, updateCount, false);
+        }
+
+        // Getters
+        public List<Map<String, Object>> getRows() {
+            return rows;
+        }
+
+        public ResultSetMetaData getMetaData() {
+            return metaData;
+        }
+
+        public int getUpdateCount() {
+            return updateCount;
+        }
+
+        public boolean isResultSet() {
+            return isResultSet;
         }
 
         // Convenience methods
@@ -50,15 +70,15 @@ public class SqlExecutor {
 
         public List<String> getColumnNames() {
             if (metaData == null)
-                return List.of();
+                return java.util.Collections.emptyList();
             try {
-                List<String> names = new java.util.ArrayList<>();
+                List<String> names = new java.util.ArrayList<String>();
                 for (int i = 1; i <= metaData.getColumnCount(); i++) {
                     names.add(metaData.getColumnName(i));
                 }
                 return names;
             } catch (Exception e) {
-                return List.of();
+                return java.util.Collections.emptyList();
             }
         }
     }
@@ -107,7 +127,7 @@ public class SqlExecutor {
             if (!sql.trim().isEmpty()) {
                 log.info("Script Statement: {}", sql);
                 try {
-                    resultHandler.accept(executeSql(sql, List.of()));
+                    resultHandler.accept(executeSql(sql, new ArrayList<Object>()));
                 } catch (Exception e) {
                     ExceptionUtils.logAndRethrow(e, "Failed to execute SQL statement in script: " + sql);
                 }
