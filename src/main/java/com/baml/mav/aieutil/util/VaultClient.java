@@ -179,7 +179,7 @@ public final class VaultClient {
     private String fetchOraclePasswordSync(String vaultBaseUrl, String clientToken, String dbName, String ait,
             String username) throws IOException {
         String secretPath = String.format("%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
-                vaultBaseUrl, dbName, ait, username).toLowerCase();
+                vaultBaseUrl, ait, dbName, username).toLowerCase();
 
         logger.info("[DEBUG] Oracle password URL: {}", secretPath);
         Map<String, String> headers = new HashMap<>();
