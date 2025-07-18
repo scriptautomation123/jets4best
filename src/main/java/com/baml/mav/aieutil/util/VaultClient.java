@@ -22,11 +22,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public final class VaultClient {
     private static final String CLIENT_TOKEN_PATH = "/auth/client_token";
     private static final String PASSWORD_PATH = "/data/password";
+    private static final String VAULT_ERRORS_KEY = "errors";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final HttpClient client;
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
-    // its right here
     private static final Logger staticLogger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
@@ -130,7 +130,7 @@ public final class VaultClient {
             for (Object entry : vaultsList) {
                 Map<String, Object> result = tryGetVaultEntry(entry, user, database);
                 if (!result.isEmpty()) {
-                    staticLogger.info("Loading vault config from: {}", result);
+                    staticLogger.info("return vault.json successful lookup: {}", result);
                     return result;
                 }
             }
@@ -160,15 +160,19 @@ public final class VaultClient {
         String authUrl = vaultBaseUrl + "/v1/auth/approle/login";
         String authBody = String.format("{\"role_id\":\"%s\",\"secret_id\":\"%s\"}", roleId, secretId);
 
-        logger.info("[DEBUG] Vault token URL: {}", authUrl);
+        logger.info("[DEBUG] Vault token URL: {} (caller: {}) ", authUrl, LoggingUtils.getCallerInfo());
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         String response = httpPost(authUrl, authBody, headers);
 
         String clientToken = parseJsonField(response, CLIENT_TOKEN_PATH);
         if (clientToken == null || clientToken.isEmpty()) {
+            staticLogger.info("[DEBUG] No client token received from Vault (caller: {}) ",
+                    LoggingUtils.getCallerInfo());
             throw new ExceptionUtils.ConfigurationException("No client token received from Vault");
+
         }
+        staticLogger.info("[DEBUG] client token {}  (caller: {}) ", clientToken, LoggingUtils.getCallerInfo());
         return clientToken;
     }
 
@@ -196,11 +200,42 @@ public final class VaultClient {
 
         if (statusCode >= 400) {
             String responseBody = EntityUtils.toString(response.getEntity());
+            String detailedError = parseVaultError(responseBody, statusCode);
+            staticLogger.error("Vault HTTP GET failed: {} - {}", statusCode, detailedError);
             throw new ExceptionUtils.ConfigurationException(
-                    "HTTP GET failed: " + statusCode + " - " + responseBody);
+                    "Vault HTTP GET failed: " + statusCode + " - " + detailedError);
         }
 
         return EntityUtils.toString(response.getEntity());
+    }
+
+    private String parseVaultError(String responseBody, int statusCode) {
+        try {
+            JsonNode errorNode = mapper.readTree(responseBody);
+
+            if (errorNode.has(VAULT_ERRORS_KEY) && errorNode.get(VAULT_ERRORS_KEY).isArray()) {
+                StringBuilder errorMsg = new StringBuilder();
+                errorMsg.append("Status: ").append(statusCode).append(" | ");
+
+                JsonNode errors = errorNode.get(VAULT_ERRORS_KEY);
+                for (JsonNode error : errors) {
+                    errorMsg.append(error.asText()).append("; ");
+                }
+
+                // Add request ID if available
+                if (errorNode.has("request_id")) {
+                    errorMsg.append("Request ID: ").append(errorNode.get("request_id").asText());
+                }
+
+                return errorMsg.toString();
+            }
+
+            // Fallback to raw response if not structured
+            return responseBody;
+        } catch (Exception e) {
+            // If JSON parsing fails, return raw response
+            return responseBody;
+        }
     }
 
     private String httpPost(String url, String body, Map<String, String> headers)
@@ -220,8 +255,10 @@ public final class VaultClient {
 
         if (statusCode >= 400) {
             String responseBody = EntityUtils.toString(response.getEntity());
+            String detailedError = parseVaultError(responseBody, statusCode);
+            staticLogger.error("Vault HTTP POST failed: {} - {}", statusCode, detailedError);
             throw new ExceptionUtils.ConfigurationException(
-                    "HTTP POST failed: " + statusCode + " - " + responseBody);
+                    "Vault HTTP POST failed: " + statusCode + " - " + detailedError);
         }
 
         return EntityUtils.toString(response.getEntity());

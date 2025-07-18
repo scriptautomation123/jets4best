@@ -44,7 +44,7 @@ public final class LoggingUtils {
                 cause.getMessage(),
                 location);
         logger.error(msg);
-        System.err.println(msg); // Direct to console, regardless of logger config
+        System.err.println(msg); // NOSONAR Direct to console, regardless of logger config
     }
 
     public static void logStructuredError(String event, String operation, String errorType, String message,
