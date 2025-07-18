@@ -37,9 +37,7 @@ public final class VaultClient {
                 .setConnectionRequestTimeout(2000) // 5 seconds connection request timeout
                 .build();
 
-        this.client = HttpClients.custom()
-                .setDefaultRequestConfig(requestConfig)
-                .build();
+        this.client = HttpClients.custom().setDefaultRequestConfig(requestConfig).build();
         logger.debug("VaultClient initialized with 5s timeouts");
     }
 
@@ -123,7 +121,7 @@ public final class VaultClient {
             throw new ExceptionUtils.ConfigurationException(
                     "vault.config system property must be specified. Use -Dvault.config=/path/to/vaults.yaml");
         }
-        staticLogger.info("Loading vault config from: {}", vaultConfigPath);
+        staticLogger.info("Loading vault config from: {} (caller: {})", vaultConfigPath, LoggingUtils.getCallerInfo());
 
         YamlConfig config = new YamlConfig(vaultConfigPath);
         Object vaultsObj = config.getAll().get("vaults");
@@ -132,6 +130,7 @@ public final class VaultClient {
             for (Object entry : vaultsList) {
                 Map<String, Object> result = tryGetVaultEntry(entry, user, database);
                 if (!result.isEmpty()) {
+                    staticLogger.info("Loading vault config from: {}", result);
                     return result;
                 }
             }
@@ -257,4 +256,5 @@ public final class VaultClient {
             return null;
         }
     }
+
 }

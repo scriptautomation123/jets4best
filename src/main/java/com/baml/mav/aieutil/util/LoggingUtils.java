@@ -65,4 +65,13 @@ public final class LoggingUtils {
         Configurator.setRootLevel(Level.ERROR);
         Configurator.setLevel("com.baml.mav.jdbcsqlrunner", Level.DEBUG);
     }
+
+    public static String getCallerInfo() {
+        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+        if (stack.length > 3) {
+            StackTraceElement caller = stack[3]; // Skip getCallerInfo, current method, and immediate caller
+            return caller.getClassName() + "." + caller.getMethodName();
+        }
+        return "unknown";
+    }
 }
