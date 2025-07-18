@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Open Terminal in Editor Area",
+            "type": "shell",
+            "command": "echo \"Opening terminal in editor area...\"", // You can replace this with any initial command
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated", 
+                "group": "editorTerminals" // A custom group to keep these terminals together
+            },
+            "runOptions": {
+                "runOn": "folderOpen" // To run this task automatically when the folder is opened
+            }
+        }
+    ]
+}

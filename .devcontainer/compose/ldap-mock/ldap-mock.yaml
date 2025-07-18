@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  mock-ldap-1:
+    image: python:3.11-slim
+    container_name: mock-ldap-1
+    ports:
+      - "1389:1389"
+    volumes:
+      - ../services/mock-ldap-server.py:/app/mock-ldap-server.py
+    working_dir: /app
+    command: python mock-ldap-server.py
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "1389"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      - oracle

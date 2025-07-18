@@ -102,8 +102,6 @@
             <artifactId>picocli</artifactId>
         </dependency>
     </dependencies>
-
-
     <!-- Centralized plugin versions -->
     <build>
         <pluginManagement>
@@ -135,8 +133,6 @@
                 </plugin>
             </plugins>
         </pluginManagement>
-
-
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -149,8 +145,6 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-
-
             <!-- 1. Shade Plugin: Builds Uberjar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -188,7 +182,6 @@
                                 <transformer
                                     implementation="org.apache.logging.log4j.core.tools.plugin.PluginCacheFileTransformer" />
                             </transformers>
-
                         </configuration>
                     </execution>
                 </executions>
@@ -216,7 +209,6 @@
                             </arguments>
                         </configuration>
                     </execution>
-    
                 </executions>
             </plugin>
             <!-- 3. use jdeps and jlink to generate a custom jre-->
@@ -240,9 +232,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-
-
         </plugins>
     </build>
 
@@ -266,7 +255,6 @@
                                     <goal>display-property-updates</goal>
                                 </goals>
                             </execution>
-
                             <!-- Update dependency properties -->
                             <execution>
                                 <id>update-dependency-properties</id>
@@ -282,7 +270,6 @@
                                     <allowSnapshots>false</allowSnapshots>
                                 </configuration>
                             </execution>
-
                             <!-- Post-update check for available updates -->
                             <execution>
                                 <id>display-updates-post</id>
@@ -297,8 +284,6 @@
                 </plugins>
             </build>
         </profile>
-
-
     </profiles>
 
 </project>

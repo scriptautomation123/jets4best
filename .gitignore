@@ -53,16 +53,13 @@ hs_err_pid*
 **/*.pmd
 .prompts
 .vscode/
-.devcontainer/
 .specstory/
 
 .sonarlint
 .cursor/
-.devcontainer/
 .serena/
 .specstory
 config-manager/pmd.xml
 exception/pmd.xml
-.devcontainer/.env
 docs/example-java-console
 docs/unzip-and-run.sh
