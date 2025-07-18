@@ -4,6 +4,7 @@ vaults:
     role-id: "KIJJAD"
     secret-id: "9080xlkvjkluwert"
     ait: "76455654"
+    db: "ECICMD03_SVC01"
   - id: "testuser"
     base-url: "vault-lle"
     role-id: "KIJJAD"

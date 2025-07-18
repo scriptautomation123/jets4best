@@ -34,7 +34,17 @@ public final class LoggingUtils {
     public static void logMinimalError(Throwable exception) {
         Logger logger = getLogger(LoggingUtils.class);
         Throwable cause = getRootCause(exception);
-        logger.error("event=error type=minimal message=Caused by: {}", cause.getMessage());
+        StackTraceElement[] stack = cause.getStackTrace();
+        String location = "";
+        if (stack != null && stack.length > 0) {
+            location = String.format(" (at %s:%d)", stack[0].getClassName(), stack[0].getLineNumber());
+        }
+        String msg = String.format("[ERROR] Caused by: %s: %s%s",
+                cause.getClass().getSimpleName(),
+                cause.getMessage(),
+                location);
+        logger.error(msg);
+        System.err.println(msg); // Direct to console, regardless of logger config
     }
 
     public static void logStructuredError(String event, String operation, String errorType, String message,

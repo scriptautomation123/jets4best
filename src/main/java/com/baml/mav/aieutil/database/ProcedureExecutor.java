@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
@@ -70,74 +69,6 @@ public class ProcedureExecutor {
     }
 
     private final Logger log = LoggingUtils.getLogger(ProcedureExecutor.class);
-    private final SqlExecutor.ConnectionSupplier connectionSupplier;
-
-    public ProcedureExecutor(SqlExecutor.ConnectionSupplier connectionSupplier) {
-        this.connectionSupplier = connectionSupplier;
-    }
-
-    // Keep existing API for backward compatibility
-    public Map<String, Object> executeProcedure(String procFullName,
-            Map<String, Object> inputParams,
-            Map<String, Integer> outputParams) throws SQLException {
-        log.info("Executing procedure: {}", procFullName);
-        try {
-            List<ProcedureParam> inputs = parseInputParams(inputParams);
-            List<ProcedureParam> outputs = parseOutputParams(outputParams);
-            String callSql = buildCallString(procFullName, inputs.size(), outputs.size());
-            log.debug("Generated call SQL: {}", callSql);
-            try (Connection conn = connectionSupplier.get();
-                    CallableStatement call = conn.prepareCall(callSql)) {
-                int idx = 1;
-                Map<String, Integer> outParamIndices = new HashMap<>();
-                for (ProcedureParam input : inputs) {
-                    setParameter(call, idx++, input.getTypedValue());
-                }
-                for (ProcedureParam output : outputs) {
-                    outParamIndices.put(output.name(), idx);
-                    call.registerOutParameter(idx++, getJdbcType(output.type()));
-                }
-                call.execute();
-                Map<String, Object> out = new LinkedHashMap<>();
-                for (Map.Entry<String, Integer> entry : outParamIndices.entrySet()) {
-                    out.put(entry.getKey(), call.getObject(entry.getValue()));
-                }
-                return out;
-            }
-        } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to execute procedure: " + procFullName);
-            throw new IllegalStateException("Unreachable");
-        }
-    }
-
-    // Modern parsing with Optional
-    private List<ProcedureParam> parseInputParams(Map<String, Object> inputParams) {
-        try {
-            return Optional.ofNullable(inputParams)
-                    .map(params -> params.values().stream()
-                            .map(Object::toString)
-                            .filter(str -> str.contains(":"))
-                            .map(ProcedureParam::fromString)
-                            .collect(Collectors.toList()))
-                    .orElse(Collections.emptyList());
-        } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to parse input parameters");
-            throw new IllegalStateException("Unreachable");
-        }
-    }
-
-    private List<ProcedureParam> parseOutputParams(Map<String, Integer> outputParams) {
-        try {
-            return Optional.ofNullable(outputParams)
-                    .map(params -> params.entrySet().stream()
-                            .map(entry -> new ProcedureParam(entry.getKey(), "VARCHAR", null))
-                            .collect(Collectors.toList()))
-                    .orElse(Collections.emptyList());
-        } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to parse output parameters");
-            throw new IllegalStateException("Unreachable");
-        }
-    }
 
     private String buildCallString(String procedureName, int inputCount, int outputCount) {
         int totalParams = inputCount + outputCount;
@@ -148,18 +79,16 @@ public class ProcedureExecutor {
     }
 
     // New method for CLI string parameter parsing
-    public Map<String, Object> executeProcedureWithStrings(String procFullName, String inputParams, String outputParams)
+    public Map<String, Object> executeProcedureWithStrings(Connection conn, String procFullName, String inputParams,
+            String outputParams)
             throws SQLException {
         log.info("Executing procedure with string parameters: {}", procFullName);
         try {
             List<ProcedureParam> inputs = parseStringInputParams(inputParams);
-
             List<ProcedureParam> outputs = parseStringOutputParams(outputParams);
-
             String callSql = buildCallString(procFullName, inputs.size(), outputs.size());
             log.debug("Generated call SQL: {}", callSql);
-            try (Connection conn = connectionSupplier.get();
-                    CallableStatement call = conn.prepareCall(callSql)) {
+            try (CallableStatement call = conn.prepareCall(callSql)) {
                 int idx = 1;
                 Map<String, Integer> outParamIndices = new HashMap<>();
                 for (ProcedureParam input : inputs) {

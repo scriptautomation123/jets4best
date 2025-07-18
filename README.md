@@ -18,3 +18,10 @@ double click jdk.bat --> choose the jdk
 for java 8:    mvn clean package
 for java 21:   mvn clean package -Pjava21
 ```
+
+### simple vault client testing
+
+```bash
+mvn clean package
+ java -cp target/aieutil-1.0.0.jar com.baml.mav.aieutil.validate.VaultClientTest
+```

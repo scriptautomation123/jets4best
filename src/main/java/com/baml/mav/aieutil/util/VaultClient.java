@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -27,8 +28,17 @@ public final class VaultClient {
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
-        this.client = HttpClients.createDefault();
-        logger.debug("VaultClient initialized");
+        // Configure timeouts for fast failure
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(2000) // 5 seconds connection timeout
+                .setSocketTimeout(2000) // 5 seconds socket timeout
+                .setConnectionRequestTimeout(2000) // 5 seconds connection request timeout
+                .build();
+
+        this.client = HttpClients.custom()
+                .setDefaultRequestConfig(requestConfig)
+                .build();
+        logger.debug("VaultClient initialized with 5s timeouts");
     }
 
     private String buildVaultBaseUrl(String baseUrl) {
@@ -45,24 +55,41 @@ public final class VaultClient {
         return String.format("https://%s.bankofamerica.com", baseUrl);
     }
 
-    public String fetchOraclePassword(String user) {
-        logger.info("Fetching Oracle password for user: {}", user);
+    public String fetchOraclePassword(String user, String database) {
+        logger.info("Fetching Oracle password for user: {} and database: {}", user, database);
 
         try {
-
-            Map<String, Object> params = getVaultParamsForUser(user);
+            Map<String, Object> params = getVaultParamsForUser(user, database);
             if (params.isEmpty()) {
                 logger.warn("No vault entry found for user: {}", user);
                 return null;
             }
 
+            // Extract and validate required parameters
             String vaultBaseUrl = (String) params.get("base-url");
             String roleId = (String) params.get("role-id");
             String secretId = (String) params.get("secret-id");
             String ait = (String) params.get("ait");
-            String dbName = (String) params.get("db");
 
-            return fetchOraclePassword(vaultBaseUrl, roleId, secretId, dbName, ait, user);
+            // Validate all required parameters are present
+            if (vaultBaseUrl == null || vaultBaseUrl.trim().isEmpty()) {
+                logger.error("Missing required vault parameter 'base-url' for user: {}", user);
+                return null;
+            }
+            if (roleId == null || roleId.trim().isEmpty()) {
+                logger.error("Missing required vault parameter 'role-id' for user: {}", user);
+                return null;
+            }
+            if (secretId == null || secretId.trim().isEmpty()) {
+                logger.error("Missing required vault parameter 'secret-id' for user: {}", user);
+                return null;
+            }
+            if (ait == null || ait.trim().isEmpty()) {
+                logger.error("Missing required vault parameter 'ait' for user: {}", user);
+                return null;
+            }
+
+            return fetchOraclePassword(vaultBaseUrl, roleId, secretId, database, ait, user);
 
         } catch (Exception e) {
             logger.error("Failed to fetch Oracle password for user: {}", user, e);
@@ -88,13 +115,13 @@ public final class VaultClient {
         }
     }
 
-    public static Map<String, Object> getVaultParamsForUser(String user) {
+    public static Map<String, Object> getVaultParamsForUser(String user, String database) {
         YamlConfig config = new YamlConfig(System.getProperty("vault.config", "vaults.yaml"));
         Object vaultsObj = config.getAll().get("vaults");
         if (vaultsObj instanceof List<?>) {
             List<?> vaultsList = (List<?>) vaultsObj;
             for (Object entry : vaultsList) {
-                Map<String, Object> result = tryGetVaultEntry(entry, user);
+                Map<String, Object> result = tryGetVaultEntry(entry, user, database);
                 if (!result.isEmpty()) {
                     return result;
                 }
@@ -104,11 +131,13 @@ public final class VaultClient {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> tryGetVaultEntry(Object entry, String user) {
+    private static Map<String, Object> tryGetVaultEntry(Object entry, String user, String database) {
         if (entry instanceof Map<?, ?>) {
             Map<?, ?> map = (Map<?, ?>) entry;
             Object entryId = map.get("id");
-            if (entryId != null && entryId.toString().equals(user)) {
+            Object entryDb = map.get("db");
+            if (entryId != null && entryId.toString().equals(user) &&
+                    entryDb != null && entryDb.toString().equals(database)) {
                 boolean allStringKeys = map.keySet().stream().allMatch(String.class::isInstance);
                 if (allStringKeys) {
                     return (Map<String, Object>) map;

@@ -2,17 +2,31 @@
 <Configuration status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <JsonLayout compact="true" eventEol="true" />
+            <PatternLayout pattern="%msg%n" />
+            <Filters>
+                <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+            </Filters>
         </Console>
+        <File name="File" fileName="logs/app.log">
+            <JsonLayout compact="true" eventEol="true" />
+        </File>
     </Appenders>
     <Loggers>
-        <!-- Set DEBUG for your main package -->
         <Logger name="com.baml.mav.aieutil" level="DEBUG" additivity="false">
+            <AppenderRef ref="File" />
             <AppenderRef ref="Console" />
         </Logger>
-        <!-- Root logger for everything else -->
-        <Root level="INFO">
+        <Logger name="com.baml.mav.aieutil.util.LoggingUtils" level="ERROR" additivity="false">
             <AppenderRef ref="Console" />
+            <AppenderRef ref="File" />
+        </Logger>
+        <Logger name="com.baml.mav.aieutil.validate.VaultClientTest" level="INFO" additivity="false">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="File" />
+        </Logger>
+        <Root level="info">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="File" />
         </Root>
     </Loggers>
 </Configuration>

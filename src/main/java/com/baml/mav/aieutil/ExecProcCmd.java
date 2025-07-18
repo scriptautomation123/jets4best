@@ -1,5 +1,6 @@
 package com.baml.mav.aieutil;
 
+import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.Map;
@@ -59,10 +60,15 @@ public class ExecProcCmd implements Callable<Integer> {
     CommandSpec spec;
 
     public static void main(String[] args) {
-        if (logger.isDebugEnabled()) {
-            logger.debug("java.home: {}", System.getProperty("java.home"));
+        try {
+            if (logger.isDebugEnabled()) {
+                logger.debug("java.home: {}", System.getProperty("java.home"));
+            }
+            System.exit(new CommandLine(new ExecProcCmd()).execute(args));
+        } catch (Exception e) {
+            LoggingUtils.logMinimalError(e);
+            System.exit(1);
         }
-        System.exit(new CommandLine(new ExecProcCmd()).execute(args));
     }
 
     @Override
@@ -74,36 +80,39 @@ public class ExecProcCmd implements Callable<Integer> {
 
         try {
             String password = resolvePassword();
-
-            if (procedure != null && !procedure.trim().isEmpty()) {
-                executeProcedure(password);
-            } else {
-                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
-                spec.commandLine().getOut().println("Success: " + (password != null));
+            if (password == null || password.trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
             }
+
+            if (procedure == null || procedure.trim().isEmpty()) {
+                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                spec.commandLine().getOut().println("Success: true");
+                return 0;
+            }
+
+            executeProcedure(password);
             return 0;
         } catch (Exception e) {
             logger.error("Operation failed", e);
-            spec.commandLine().getErr().println("[ERROR] " + e.getMessage());
+            LoggingUtils.logMinimalError(e);
             return 1;
         }
     }
 
     private void executeProcedure(String password) {
-        try {
-            ConnectionManager.ConnInfo connInfo = ConnectionManager.createConnection(type, database, user, password,
-                    null);
-
-            Map<String, Object> result = new ProcedureExecutor(
-                    () -> DriverManager.getConnection(connInfo.getUrl(), connInfo.getUser(), connInfo.getPassword()))
-                    .executeProcedureWithStrings(procedure, input, output);
+        String connectionUrl = ConnectionManager.createConnection(type, database, user, password, null).getUrl();
+        try (Connection conn = DriverManager.getConnection(connectionUrl, user, password)) {
+            Map<String, Object> result = new ProcedureExecutor().executeProcedureWithStrings(conn, procedure, input,
+                    output);
 
             if (result.size() == 1) {
                 Object value = result.values().iterator().next();
                 spec.commandLine().getOut().println(value != null ? value.toString() : "null");
-            } else {
-                result.forEach((key, value) -> spec.commandLine().getOut().println(key + ": " + value));
+                return;
             }
+
+            result.forEach((key, value) -> spec.commandLine().getOut().println(key + ": " + value));
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to execute procedure: " + procedure);
         }
@@ -116,11 +125,10 @@ public class ExecProcCmd implements Callable<Integer> {
             return client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user);
         }
 
-        Map<String, Object> vaultParams = VaultClient.getVaultParamsForUser(user);
-        if (!vaultParams.isEmpty()) {
-            logger.info("Found vault config for user: {}", user);
-            VaultClient client = new VaultClient();
-            return client.fetchOraclePassword(user);
+        VaultClient client = new VaultClient();
+        String password = client.fetchOraclePassword(user, database);
+        if (password != null && !password.trim().isEmpty()) {
+            return password;
         }
 
         spec.commandLine().getOut().println("[INFO] No vault config found for user: " + user);
@@ -138,10 +146,10 @@ public class ExecProcCmd implements Callable<Integer> {
             spec.commandLine().getOut().print("Enter password: ");
             if (System.console() != null) {
                 return new String(System.console().readPassword());
-            } else {
-                try (java.util.Scanner scanner = new java.util.Scanner(System.in)) {
-                    return scanner.nextLine();
-                }
+            }
+
+            try (java.util.Scanner scanner = new java.util.Scanner(System.in)) {
+                return scanner.nextLine();
             }
         } catch (Exception e) {
             logger.warn("Failed to read password from console: {}", e.getMessage());

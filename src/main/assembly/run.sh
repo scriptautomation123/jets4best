@@ -30,7 +30,7 @@ else
     fi
 fi
 
-JAVA_VERSION=$("$JAVA_CMD" -version 2>&1 | awk -F[\".] '/version/ {print $2}')
+JAVA_VERSION=$("$JAVA_CMD" -version 2>&1 | awk -F[\".] '/version/ {if ($2 == "1") print $3; else print $2}')
 if [ "$JAVA_TYPE" = "bundled" ]; then
     echo "✅ Using bundled JRE: $JRE_DIR"
 elif [ "$JAVA_TYPE" = "JAVA_HOME" ]; then
@@ -40,13 +40,12 @@ else
 fi
 
 if [ "$JAVA_VERSION" = "8" ] || [ "$JAVA_VERSION" = "21" ]; then
-    echo "Java version: $("$JAVA_CMD" -version 2>&1 | head -n 1)"
+    echo "Java version: $($JAVA_CMD -version 2>&1 | head -n 1)"
 else
-    echo "⚠️  Warning: Detected Java version is not 8 or 21!"
-    "$JAVA_CMD" -version
+    echo "⚠️  Warning: Detected Java version is not 8 or 21! (JAVA_VERSION=$JAVA_VERSION)"
+    $JAVA_CMD -version
 fi
-
-JAVA_OPTS="-Dfile.encoding=UTF-8"
+JAVA_OPTS="-Dfile.encoding=UTF-8 -Dsun.net.inetaddr.negative.ttl=1"
 if [ -f "$BUNDLE_DIR/log4j2.xml" ]; then
     JAVA_OPTS="$JAVA_OPTS -Dlog4j.configurationFile=$BUNDLE_DIR/log4j2.xml"
 fi
