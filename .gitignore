@@ -18,7 +18,7 @@ target/
 ehthumbs.db
 Thumbs.db
 **plantuml.jar**
-scripts
+
 # Logs
 *.log
 logs/
