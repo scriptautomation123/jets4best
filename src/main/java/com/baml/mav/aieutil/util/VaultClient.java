@@ -118,7 +118,11 @@ public final class VaultClient {
     }
 
     public static Map<String, Object> getVaultParamsForUser(String user, String database) {
-        String vaultConfigPath = System.getProperty("vault.config", "vaults.yaml");
+        String vaultConfigPath = System.getProperty("vault.config");
+        if (vaultConfigPath == null || vaultConfigPath.trim().isEmpty()) {
+            throw new ExceptionUtils.ConfigurationException(
+                    "vault.config system property must be specified. Use -Dvault.config=/path/to/vaults.yaml");
+        }
         staticLogger.info("Loading vault config from: {}", vaultConfigPath);
 
         YamlConfig config = new YamlConfig(vaultConfigPath);
