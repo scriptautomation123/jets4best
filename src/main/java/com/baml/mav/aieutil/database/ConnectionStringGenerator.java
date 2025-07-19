@@ -97,12 +97,21 @@ public class ConnectionStringGenerator {
         @Override
         public String buildUrl() {
             try {
-                String template = appConfig.getRawValue("databases.oracle.connection-string.ldap.template");
                 int port = Integer.parseInt(appConfig.getRawValue("databases.oracle.connection-string.ldap.port"));
                 String context = appConfig.getRawValue("databases.oracle.connection-string.ldap.context");
-                String servers = String.join(",",
-                        appConfig.getRawValue("databases.oracle.connection-string.ldap.servers").split(","));
-                return String.format(template, servers, port, database, context);
+                String[] servers = appConfig.getRawValue("databases.oracle.connection-string.ldap.servers").split(",");
+
+                StringBuilder urlBuilder = new StringBuilder("jdbc:oracle:thin:@");
+
+                for (int i = 0; i < servers.length; i++) {
+                    if (i > 0) {
+                        urlBuilder.append(" ");
+                    }
+                    urlBuilder.append(String.format("ldap://%s:%d/%s,%s",
+                            servers[i].trim(), port, database, context));
+                }
+
+                return urlBuilder.toString();
             } catch (Exception e) {
                 throw ExceptionUtils.wrap(e, "Failed to build Oracle LDAP URL for database=" + database);
             }
