@@ -5,7 +5,7 @@ import java.util.Objects;
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.YamlConfig;
 
-public class ConnectionManager {
+public class ConnectionStringGenerator {
     private static final YamlConfig appConfig = new YamlConfig("application.yaml");
 
     public static class ConnInfo {
@@ -109,7 +109,8 @@ public class ConnectionManager {
         }
     }
 
-    public static ConnInfo createConnection(String type, String database, String user, String password, String host) {
+    public static ConnInfo createConnectionString(String type, String database, String user, String password,
+            String host) {
         ConnectionStrategy strategy;
 
         if ("h2".equals(type)) {

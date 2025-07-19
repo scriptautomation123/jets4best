@@ -8,7 +8,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.logging.log4j.Logger;
 
-import com.baml.mav.aieutil.database.ConnectionManager;
+import com.baml.mav.aieutil.database.ConnectionStringGenerator;
 import com.baml.mav.aieutil.database.ProcedureExecutor;
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;
@@ -101,7 +101,8 @@ public class ExecProcCmd implements Callable<Integer> {
     }
 
     private void executeProcedure(String password) {
-        String connectionUrl = ConnectionManager.createConnection(type, database, user, password, null).getUrl();
+        String connectionUrl = ConnectionStringGenerator.createConnectionString(type, database, user, password, null)
+                .getUrl();
         try (Connection conn = DriverManager.getConnection(connectionUrl, user, password)) {
             Map<String, Object> result = new ProcedureExecutor().executeProcedureWithStrings(conn, procedure, input,
                     output);

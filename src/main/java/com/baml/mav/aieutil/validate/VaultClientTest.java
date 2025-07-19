@@ -1,14 +1,14 @@
 package com.baml.mav.aieutil.validate;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
+import com.baml.mav.aieutil.database.ConnectionStringGenerator;
+import com.baml.mav.aieutil.util.LoggingUtils;
 import com.baml.mav.aieutil.util.VaultClient;
 
 public class VaultClientTest {
-    private static final Logger logger = LogManager.getLogger(VaultClientTest.class);
+    private static final Logger logger = LoggingUtils.getLogger(VaultClientTest.class);
     private static final String TEST_DATABASE = "ECICMD03_SVC01";
     private static final String TEST_USER = "MAV_T2T_APP";
 
@@ -72,6 +72,10 @@ public class VaultClientTest {
                 logger.info("Password length: {} characters", passwordLength);
                 String passwordPrefix = password.substring(0, Math.min(4, passwordLength));
                 logger.info("Password (first 4 chars): {}", passwordPrefix);
+
+                // Step 3: Generate LDAP connection string
+                logger.info("Step 3: Generating LDAP connection string");
+                testLdapConnectionString("oracle", db, user, password);
             } else {
                 logger.error("FAILED: No password returned from vault");
             }
@@ -81,5 +85,25 @@ public class VaultClientTest {
         }
 
         logger.info("=== END FULL VAULT PASSWORD LOOKUP TEST ===\n");
+    }
+
+    private static void testLdapConnectionString(String type, String database, String user, String password) {
+        logger.info("Testing LDAP connection string generation");
+        logger.info("Parameters: type={}, database={}, user={}, password.length={}",
+                type, database, user, password != null ? password.length() : 0);
+
+        try {
+            // Generate LDAP connection string (null host = use LDAP)
+            String connectionUrl = ConnectionStringGenerator
+                    .createConnectionString(type, database, user, password, null).getUrl();
+
+            logger.info("SUCCESS: LDAP connection string generated");
+            logger.info("Connection URL: {}", connectionUrl);
+
+        } catch (Exception e) {
+            logger.error("FAILED: Error generating LDAP connection string: {}", e.getMessage(), e);
+        }
+
+        logger.info("");
     }
 }

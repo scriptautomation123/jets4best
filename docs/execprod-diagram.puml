@@ -65,7 +65,7 @@ else (no)
 endif
 
 |#LightCyan|Connection Management|
-:ConnectionManager.createConnection(\ntype, database, user, password, null);
+:ConnectionStringGenerator.createConnectionString(\ntype, database, user, password, null);
 
 :Generate LDAP connection string;
 note right: Build Oracle LDAP URL for production database
