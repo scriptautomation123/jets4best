@@ -112,7 +112,6 @@ public class ExecProcCmd implements Callable<Integer> {
                 spec.commandLine().getOut().println(value != null ? value.toString() : "null");
                 return;
             }
-
             result.forEach((key, value) -> spec.commandLine().getOut().println(key + ": " + value));
         } catch (Exception e) {
             ExceptionUtils.logAndRethrow(e, "Failed to execute procedure: " + procedure);

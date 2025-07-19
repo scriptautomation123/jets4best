@@ -12,6 +12,12 @@ public class VaultClientTest {
     private static final Logger logger = LoggingUtils.getLogger(VaultClientTest.class);
     private static final String TEST_DATABASE = "ECICMD03_SVC01";
     private static final String TEST_USER = "MAV_T2T_APP";
+    private static final String NO_VAULT_PARAMS_MSG = "No vault parameters found for user='{}' and db='{}'";
+    private static final String BASE_URL_KEY = "base-url";
+    private static final String ROLE_ID_KEY = "role-id";
+    private static final String SECRET_ID_KEY = "secret-id";
+    private static final String ORACLE_TYPE = "oracle";
+    private static final String CONNECTION_URL_MSG = "Connection URL: {}";
 
     public static void main(String[] args) {
         testLookup(TEST_USER, TEST_DATABASE); // Should match
@@ -22,6 +28,12 @@ public class VaultClientTest {
 
         logger.info("=== FULL VAULT PASSWORD LOOKUP TEST ===");
         testFullVaultPasswordLookup(TEST_USER, TEST_DATABASE);
+
+        logger.info("=== LDAP CONNECTION STRING GENERATION TEST ===");
+        testLdapConnectionStringGeneration(TEST_USER, TEST_DATABASE);
+
+        logger.info("=== DATABASE CONNECTION TEST ===");
+        testDatabaseConnection(TEST_USER, TEST_DATABASE);
     }
 
     private static void testLookup(String user, String db) {
@@ -44,16 +56,16 @@ public class VaultClientTest {
             Map<String, Object> vaultParams = VaultClient.getVaultParamsForUser(user, db);
 
             if (vaultParams == null || vaultParams.isEmpty()) {
-                logger.error("No vault parameters found for user='{}' and db='{}'", user, db);
+                logger.error(NO_VAULT_PARAMS_MSG, user, db);
                 return;
             }
 
             logger.info("Vault parameters found: {}", vaultParams);
 
             // Extract parameters
-            String baseUrl = (String) vaultParams.get("base-url");
-            String roleId = (String) vaultParams.get("role-id");
-            String secretId = (String) vaultParams.get("secret-id");
+            String baseUrl = (String) vaultParams.get(BASE_URL_KEY);
+            String roleId = (String) vaultParams.get(ROLE_ID_KEY);
+            String secretId = (String) vaultParams.get(SECRET_ID_KEY);
             String ait = (String) vaultParams.get("ait");
 
             logger.info("Extracted parameters:");
@@ -76,7 +88,7 @@ public class VaultClientTest {
 
                 // Step 3: Generate LDAP connection string
                 logger.info("Step 3: Generating LDAP connection string");
-                testLdapConnectionString("oracle", db, user, password);
+                testLdapConnectionString(ORACLE_TYPE, db, user, password);
             } else {
                 logger.error("FAILED: No password returned from vault");
             }
@@ -86,6 +98,83 @@ public class VaultClientTest {
         }
 
         logger.info("=== END FULL VAULT PASSWORD LOOKUP TEST ===\n");
+    }
+
+    private static void testLdapConnectionStringGeneration(String user, String db) {
+        logger.info("Testing LDAP connection string generation for user='{}', db='{}'", user, db);
+
+        try {
+            // Get vault parameters and password
+            Map<String, Object> vaultParams = VaultClient.getVaultParamsForUser(user, db);
+            if (vaultParams == null || vaultParams.isEmpty()) {
+                logger.error(NO_VAULT_PARAMS_MSG, user, db);
+                return;
+            }
+
+            VaultClient vaultClient = new VaultClient();
+            String baseUrl = (String) vaultParams.get(BASE_URL_KEY);
+            String roleId = (String) vaultParams.get(ROLE_ID_KEY);
+            String secretId = (String) vaultParams.get(SECRET_ID_KEY);
+            String ait = (String) vaultParams.get("ait");
+
+            String password = vaultClient.fetchOraclePassword(baseUrl, roleId, secretId, db, ait, user);
+            if (password == null || password.isEmpty()) {
+                logger.error("No password retrieved for user='{}' and db='{}'", user, db);
+                return;
+            }
+
+            // Generate LDAP connection string (null host = use LDAP)
+            String connectionUrl = ConnectionStringGenerator
+                    .createConnectionString(ORACLE_TYPE, db, user, password, null).getUrl();
+
+            logger.info("SUCCESS: LDAP connection string generated");
+            logger.info(CONNECTION_URL_MSG, connectionUrl);
+
+        } catch (Exception e) {
+            logger.error("FAILED: Error generating LDAP connection string: {}", e.getMessage(), e);
+        }
+
+        logger.info("");
+    }
+
+    private static void testDatabaseConnection(String user, String db) {
+        logger.info("Testing actual database connection for user='{}', db='{}'", user, db);
+
+        try {
+            // Get vault parameters and password
+            Map<String, Object> vaultParams = VaultClient.getVaultParamsForUser(user, db);
+            if (vaultParams == null || vaultParams.isEmpty()) {
+                logger.error(NO_VAULT_PARAMS_MSG, user, db);
+                return;
+            }
+
+            VaultClient vaultClient = new VaultClient();
+            String baseUrl = (String) vaultParams.get(BASE_URL_KEY);
+            String roleId = (String) vaultParams.get(ROLE_ID_KEY);
+            String secretId = (String) vaultParams.get(SECRET_ID_KEY);
+            String ait = (String) vaultParams.get("ait");
+
+            String password = vaultClient.fetchOraclePassword(baseUrl, roleId, secretId, db, ait, user);
+            if (password == null || password.isEmpty()) {
+                logger.error("No password retrieved for user='{}' and db='{}'", user, db);
+                return;
+            }
+
+            // Generate LDAP connection string
+            String connectionUrl = ConnectionStringGenerator
+                    .createConnectionString(ORACLE_TYPE, db, user, password, null).getUrl();
+
+            logger.info(CONNECTION_URL_MSG, connectionUrl);
+            logger.info("User: {}", user);
+
+            // Test actual database connection
+            testDatabaseQuery(connectionUrl, user, password);
+
+        } catch (Exception e) {
+            logger.error("FAILED: Error during database connection test: {}", e.getMessage(), e);
+        }
+
+        logger.info("");
     }
 
     private static void testLdapConnectionString(String type, String database, String user, String password) {
@@ -99,12 +188,29 @@ public class VaultClientTest {
                     .createConnectionString(type, database, user, password, null).getUrl();
 
             logger.info("SUCCESS: LDAP connection string generated");
-            logger.info("Connection URL: {}", connectionUrl);
+            logger.info(CONNECTION_URL_MSG, connectionUrl);
 
         } catch (Exception e) {
             logger.error("FAILED: Error generating LDAP connection string: {}", e.getMessage(), e);
         }
 
         logger.info("");
+    }
+
+    private static void testDatabaseQuery(String connectionUrl, String user, String password) {
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection(connectionUrl, user, password)) {
+            logger.info("SUCCESS: Database connection established");
+
+            // Test a simple query to verify connection works
+            try (java.sql.Statement stmt = conn.createStatement()) {
+                java.sql.ResultSet rs = stmt.executeQuery("SELECT 1 FROM DUAL");
+                if (rs.next()) {
+                    logger.info("SUCCESS: Test query executed successfully");
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("FAILED: Database connection failed: {}", e.getMessage(), e);
+        }
     }
 }
