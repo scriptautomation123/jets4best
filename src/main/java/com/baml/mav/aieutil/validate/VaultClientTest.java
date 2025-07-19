@@ -1,7 +1,8 @@
 package com.baml.mav.aieutil.validate;
 
 import java.util.Map;
-import java.util.logging.Logger;
+
+import org.apache.logging.log4j.Logger;
 
 import com.baml.mav.aieutil.database.ConnectionStringGenerator;
 import com.baml.mav.aieutil.util.LoggingUtils;
