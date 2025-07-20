@@ -15,7 +15,6 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
-import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,11 +23,17 @@ public final class VaultClient implements AutoCloseable {
     private static final String CLIENT_TOKEN_PATH = "/auth/client_token";
     private static final String PASSWORD_PATH = "/data/password";
     private static final String VAULT_ERRORS_KEY = "errors";
+    private static final String VAULT_CLIENT = "vault_client";
+    private static final String FETCH_PASSWORD = "fetch_password";
+    private static final String SUCCESS = "SUCCESS";
+    private static final String STARTED = "STARTED";
+    private static final String VAULT_OPERATION = "vault_operation";
+    private static final String MISSING_PARAM = "MISSING_PARAM";
+    private static final String FAILED = "FAILED";
+    private static final String CLOSE = "close";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final CloseableHttpClient client;
-    private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
-    private static final Logger staticLogger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
         // Configure connection pooling
@@ -48,7 +53,8 @@ public final class VaultClient implements AutoCloseable {
                 .setDefaultRequestConfig(requestConfig)
                 .build();
 
-        logger.debug("VaultClient initialized with connection pooling and 2s timeouts");
+        LoggingUtils.logStructuredError(VAULT_CLIENT, "initialize", SUCCESS,
+                "VaultClient initialized with connection pooling and 2s timeouts", null);
     }
 
     private String buildVaultBaseUrl(String baseUrl) {
@@ -56,22 +62,23 @@ public final class VaultClient implements AutoCloseable {
             throw new ExceptionUtils.ConfigurationException("Base URL cannot be null or empty");
         }
 
-        // If it already contains protocol, return as-is
         if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
             return baseUrl;
         }
 
-        // Build the full URL with bankofamerica.com domain
-        return String.format("https://%s.bankofamerica.com", baseUrl);
+        // For security, require full URLs to be provided
+        throw new ExceptionUtils.ConfigurationException(
+                "Vault URL must be a complete URL with protocol (e.g., https://vault.example.com). " +
+                        "Received: " + baseUrl);
     }
 
     public String fetchOraclePassword(String user, String database) {
-        logger.info("Fetching Oracle password for user: {} and database: {}", user, database);
+        LoggingUtils.logVaultOperation(FETCH_PASSWORD, user, STARTED);
 
         try {
             Map<String, Object> params = getVaultParamsForUser(user, database);
             if (params.isEmpty()) {
-                logger.warn("No vault entry found for user: {}", user);
+                LoggingUtils.logVaultOperation(FETCH_PASSWORD, user, "NO_CONFIG");
                 return null;
             }
 
@@ -83,44 +90,50 @@ public final class VaultClient implements AutoCloseable {
 
             // Validate all required parameters are present
             if (vaultBaseUrl == null || vaultBaseUrl.trim().isEmpty()) {
-                logger.error("Missing required vault parameter 'base-url' for user: {}", user);
+                LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, MISSING_PARAM,
+                        "Missing required vault parameter 'base-url' for user: " + user, null);
                 return null;
             }
             if (roleId == null || roleId.trim().isEmpty()) {
-                logger.error("Missing required vault parameter 'role-id' for user: {}", user);
+                LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, MISSING_PARAM,
+                        "Missing required vault parameter 'role-id' for user: " + user, null);
                 return null;
             }
             if (secretId == null || secretId.trim().isEmpty()) {
-                logger.error("Missing required vault parameter 'secret-id' for user: {}", user);
+                LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, MISSING_PARAM,
+                        "Missing required vault parameter 'secret-id' for user: " + user, null);
                 return null;
             }
             if (ait == null || ait.trim().isEmpty()) {
-                logger.error("Missing required vault parameter 'ait' for user: {}", user);
+                LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, MISSING_PARAM,
+                        "Missing required vault parameter 'ait' for user: " + user, null);
                 return null;
             }
 
             return fetchOraclePassword(vaultBaseUrl, roleId, secretId, database, ait, user);
 
         } catch (Exception e) {
-            logger.error("Failed to fetch Oracle password for user: {}", user, e);
+            LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, FAILED,
+                    "Failed to fetch Oracle password for user: " + user, e);
             return null;
         }
     }
 
     public String fetchOraclePassword(String vaultBaseUrl, String roleId, String secretId, String dbName, String ait,
             String username) {
-        logger.info("Fetching Oracle password for database: {}, AIT: {}, username: {}", dbName, ait, username);
+        LoggingUtils.logVaultOperation(FETCH_PASSWORD, username, STARTED);
 
         try {
             // Parse and format the base URL
             String fullVaultUrl = buildVaultBaseUrl(vaultBaseUrl);
-            logger.info("Using Vault URL: {}", fullVaultUrl);
+            LoggingUtils.logVaultAuthentication(fullVaultUrl, SUCCESS);
 
             String clientToken = authenticateToVault(fullVaultUrl, roleId, secretId);
             String oraclePasswordResponse = fetchOraclePasswordSync(fullVaultUrl, clientToken, dbName, ait, username);
             return parsePasswordFromResponse(oraclePasswordResponse);
         } catch (Exception e) {
-            logger.error("Failed to fetch Oracle password", e);
+            LoggingUtils.logStructuredError(VAULT_OPERATION, FETCH_PASSWORD, FAILED,
+                    "Failed to fetch Oracle password", e);
             throw new ExceptionUtils.ConfigurationException("Failed to fetch Oracle password", e);
         }
     }
@@ -131,7 +144,7 @@ public final class VaultClient implements AutoCloseable {
             throw new ExceptionUtils.ConfigurationException(
                     "vault.config system property must be specified. Use -Dvault.config=/path/to/vaults.yaml");
         }
-        staticLogger.info("Loading vault config from: {} (caller: {})", vaultConfigPath, LoggingUtils.getCallerInfo());
+        LoggingUtils.logConfigLoading(vaultConfigPath);
 
         YamlConfig config = new YamlConfig(vaultConfigPath);
         Object vaultsObj = config.getAll().get("vaults");
@@ -140,7 +153,8 @@ public final class VaultClient implements AutoCloseable {
             for (Object entry : vaultsList) {
                 Map<String, Object> result = tryGetVaultEntry(entry, user, database);
                 if (!result.isEmpty()) {
-                    staticLogger.info("return vault.json successful lookup: {}", result);
+                    LoggingUtils.logStructuredError(VAULT_CLIENT, "get_vault_params", SUCCESS,
+                            "return vault.json successful lookup: " + result, null);
                     return result;
                 }
             }
@@ -156,10 +170,13 @@ public final class VaultClient implements AutoCloseable {
             Object entryDb = map.get("db");
             if (entryId != null && entryId.toString().equals(user) &&
                     entryDb != null && entryDb.toString().equals(database)) {
-                boolean allStringKeys = map.keySet().stream().allMatch(String.class::isInstance);
-                if (allStringKeys) {
-                    return (Map<String, Object>) map;
+                // Optimized check for string keys - avoid stream for simple iteration
+                for (Object key : map.keySet()) {
+                    if (!(key instanceof String)) {
+                        return Collections.emptyMap();
+                    }
                 }
+                return (Map<String, Object>) map;
             }
         }
         return Collections.emptyMap();
@@ -170,19 +187,18 @@ public final class VaultClient implements AutoCloseable {
         String authUrl = vaultBaseUrl + "/v1/auth/approle/login";
         String authBody = String.format("{\"role_id\":\"%s\",\"secret_id\":\"%s\"}", roleId, secretId);
 
-        logger.info("[DEBUG] Vault token URL: {} (caller: {}) ", authUrl, LoggingUtils.getCallerInfo());
+        LoggingUtils.logVaultAuthentication(authUrl, STARTED);
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         String response = httpPost(authUrl, authBody, headers);
 
         String clientToken = parseJsonField(response, CLIENT_TOKEN_PATH);
         if (clientToken == null || clientToken.isEmpty()) {
-            staticLogger.info("[DEBUG] No client token received from Vault (caller: {}) ",
-                    LoggingUtils.getCallerInfo());
+            LoggingUtils.logVaultAuthentication(authUrl, FAILED);
             throw new ExceptionUtils.ConfigurationException("No client token received from Vault");
 
         }
-        staticLogger.info("[DEBUG] client token {}  (caller: {}) ", clientToken, LoggingUtils.getCallerInfo());
+        LoggingUtils.logVaultAuthentication(authUrl, SUCCESS);
         return clientToken;
     }
 
@@ -191,10 +207,12 @@ public final class VaultClient implements AutoCloseable {
         String secretPath = String.format("%s/v1/secrets/database/oracle/static-creds/%s-%s-%s",
                 vaultBaseUrl, ait, dbName, username).toLowerCase();
 
-        logger.info("[DEBUG] Oracle password URL: {}", secretPath);
+        LoggingUtils.logVaultOperation(FETCH_PASSWORD, username, STARTED);
         Map<String, String> headers = new HashMap<>();
         headers.put("x-vault-token", clientToken);
-        return httpGet(secretPath, headers);
+        String response = httpGet(secretPath, headers);
+        LoggingUtils.logVaultOperation(FETCH_PASSWORD, username, SUCCESS);
+        return response;
     }
 
     private String httpGet(String url, Map<String, String> headers) throws IOException {
@@ -211,7 +229,8 @@ public final class VaultClient implements AutoCloseable {
             if (statusCode >= 400) {
                 String responseBody = EntityUtils.toString(response.getEntity());
                 String detailedError = parseVaultError(responseBody, statusCode);
-                staticLogger.error("Vault HTTP GET failed: {} - {}", statusCode, detailedError);
+                LoggingUtils.logStructuredError(VAULT_CLIENT, "http_get", FAILED,
+                        "Vault HTTP GET failed: " + statusCode + " - " + detailedError, null);
                 throw new ExceptionUtils.ConfigurationException(
                         "Vault HTTP GET failed: " + statusCode + " - " + detailedError);
             }
@@ -266,7 +285,8 @@ public final class VaultClient implements AutoCloseable {
             if (statusCode >= 400) {
                 String responseBody = EntityUtils.toString(response.getEntity());
                 String detailedError = parseVaultError(responseBody, statusCode);
-                staticLogger.error("Vault HTTP POST failed: {} - {}", statusCode, detailedError);
+                LoggingUtils.logStructuredError(VAULT_CLIENT, "http_post", FAILED,
+                        "Vault HTTP POST failed: " + statusCode + " - " + detailedError, null);
                 throw new ExceptionUtils.ConfigurationException(
                         "Vault HTTP POST failed: " + statusCode + " - " + detailedError);
             }
@@ -283,6 +303,8 @@ public final class VaultClient implements AutoCloseable {
             }
             return password;
         } catch (Exception e) {
+            LoggingUtils.logStructuredError(VAULT_CLIENT, "parse_password", FAILED,
+                    "Failed to parse Vault response", e);
             throw new ExceptionUtils.ConfigurationException("Failed to parse Vault response", e);
         }
     }
@@ -300,7 +322,8 @@ public final class VaultClient implements AutoCloseable {
             }
             return node.asText();
         } catch (Exception e) {
-            logger.error("Failed to parse JSON field: {}", path, e);
+            LoggingUtils.logStructuredError(VAULT_CLIENT, "parse_json_field", FAILED,
+                    "Failed to parse JSON field: " + path, e);
             return null;
         }
     }
@@ -308,8 +331,17 @@ public final class VaultClient implements AutoCloseable {
     @Override
     public void close() throws IOException {
         if (client != null) {
-            logger.debug("Closing VaultClient HTTP client");
-            client.close();
+            LoggingUtils.logStructuredError(VAULT_CLIENT, CLOSE, STARTED,
+                    "Closing VaultClient HTTP client", null);
+            try {
+                client.close();
+                LoggingUtils.logStructuredError(VAULT_CLIENT, CLOSE, SUCCESS,
+                        "VaultClient HTTP client closed successfully", null);
+            } catch (IOException e) {
+                LoggingUtils.logStructuredError(VAULT_CLIENT, CLOSE, FAILED,
+                        "Error closing HTTP client: " + e.getMessage(), e);
+                throw e;
+            }
         }
     }
 }

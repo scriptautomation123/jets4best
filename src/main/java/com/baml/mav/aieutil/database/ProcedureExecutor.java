@@ -13,12 +13,11 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.Logger;
-
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;
 
 public class ProcedureExecutor {
+    private static final String FAILED = "FAILED";
 
     public static class ProcedureParam {
         private final String name;
@@ -46,7 +45,8 @@ public class ProcedureExecutor {
         public static ProcedureParam fromString(String input) {
             String[] parts = input.split(":");
             if (parts.length != 3) {
-                throw new IllegalArgumentException("Invalid parameter format: " + input);
+                throw new IllegalArgumentException(
+                        "Invalid parameter format. Expected 'name:type:value', got: " + input);
             }
             return new ProcedureParam(parts[0], parts[1], parts[2]);
         }
@@ -68,8 +68,6 @@ public class ProcedureExecutor {
         }
     }
 
-    private final Logger log = LoggingUtils.getLogger(ProcedureExecutor.class);
-
     private String buildCallString(String procedureName, int inputCount, int outputCount) {
         int totalParams = inputCount + outputCount;
         StringJoiner q = new StringJoiner(",", "(", ")");
@@ -82,12 +80,12 @@ public class ProcedureExecutor {
     public Map<String, Object> executeProcedureWithStrings(Connection conn, String procFullName, String inputParams,
             String outputParams)
             throws SQLException {
-        log.info("Executing procedure with string parameters: {}", procFullName);
+        LoggingUtils.logProcedureExecution(procFullName, inputParams, outputParams);
         try {
             List<ProcedureParam> inputs = parseStringInputParams(inputParams);
             List<ProcedureParam> outputs = parseStringOutputParams(outputParams);
             String callSql = buildCallString(procFullName, inputs.size(), outputs.size());
-            log.debug("Generated call SQL: {}", callSql);
+
             try (CallableStatement call = conn.prepareCall(callSql)) {
                 int idx = 1;
                 Map<String, Integer> outParamIndices = new HashMap<>();
@@ -106,8 +104,9 @@ public class ProcedureExecutor {
                 return out;
             }
         } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to execute procedure with string parameters: " + procFullName);
-            throw new IllegalStateException("Unreachable");
+            LoggingUtils.logStructuredError("procedure_execution", "execute", FAILED,
+                    "Failed to execute procedure with string parameters: " + procFullName, e);
+            throw ExceptionUtils.wrap(e, "Failed to execute procedure with string parameters: " + procFullName);
         }
     }
 
@@ -123,8 +122,9 @@ public class ProcedureExecutor {
                     .map(ProcedureParam::fromString)
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to parse string input parameters");
-            throw new IllegalStateException("Unreachable");
+            LoggingUtils.logStructuredError("parameter_parsing", "parse_input", FAILED,
+                    "Failed to parse string input parameters", e);
+            throw ExceptionUtils.wrap(e, "Failed to parse string input parameters");
         }
     }
 
@@ -143,8 +143,9 @@ public class ProcedureExecutor {
                     })
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to parse string output parameters");
-            throw new IllegalStateException("Unreachable");
+            LoggingUtils.logStructuredError("parameter_parsing", "parse_output", FAILED,
+                    "Failed to parse string output parameters", e);
+            throw ExceptionUtils.wrap(e, "Failed to parse string output parameters");
         }
     }
 

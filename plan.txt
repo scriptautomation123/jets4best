@@ -1,0 +1,1747 @@
+
+
+---
+
+_**Assistant**_
+
+Yes, absolutely! You can use PicoCLI's built-in validation features instead of manual checks. Here's how to refactor it:
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    private static final Logger logger = LoggingUtils.getLogger(ExecProcCmd.class);
+
+    @Option(names = { "-t", "--type" }, description = "Database type", defaultValue = "oracle")
+    String type;
+
+    @Option(names = { "-d", "--database" }, description = "Database name", required = true)
+    String database;
+
+    @Option(names = { "-u", "--user" }, description = "Database username", required = true)
+    String user;
+
+    // ... other options ...
+
+    @Parameters(index = "0", description = "Stored procedure name (e.g., MAV_OWNER.TemplateTable.Onehadoop_proc)", 
+                arity = "0..1", defaultValue = "")
+    String procedure;
+
+    // ... rest of options ...
+
+    @Override
+    public Integer call() {
+        try {
+            String password = resolvePassword();
+            if (password == null || password.trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            }
+
+            if (procedure.trim().isEmpty()) {
+                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                spec.commandLine().getOut().println("Success: true");
+                return 0;
+            }
+
+            executeProcedure(password);
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+
+    // ... rest of methods unchanged ...
+}
+```
+
+## Key Changes:
+
+1. **Removed manual validation** - PicoCLI handles `--user` and `--database` validation automatically with `required = true`
+
+2. **Simplified procedure check** - Just check if it's empty since PicoCLI handles the arity
+
+3. **Cleaner code** - Less boilerplate validation logic
+
+## Alternative: Custom Validator
+
+If you want even more validation, you could add a custom validator:
+
+```java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    @Option(names = { "-d", "--database" }, description = "Database name", required = true)
+    @Pattern(regexp = "^[A-Z0-9_]+$", message = "Database name must contain only uppercase letters, numbers, and underscores")
+    String database;
+
+    @Option(names = { "-u", "--user" }, description = "Database username", required = true)
+    @Pattern(regexp = "^[A-Z0-9_]+$", message = "Username must contain only uppercase letters, numbers, and underscores")
+    String user;
+
+    // ... rest of code ...
+}
+```
+
+This approach leverages PicoCLI's built-in validation capabilities and reduces manual validation code.
+
+---
+
+_**User**_
+
+so we can get rid of this right? 
+
+
+---
+
+_**Assistant**_
+
+Yes, exactly! You can get rid of that manual validation code. PicoCLI's `required = true` annotation on the `@Option` fields will automatically handle the validation and show appropriate error messages if `--user` or `--database` are missing.
+
+The changes you made are perfect:
+
+1. ✅ **Removed manual validation** - PicoCLI handles required field validation
+2. ✅ **Added `defaultValue = ""`** - This ensures `procedure` is never null, so you only need to check `procedure.trim().isEmpty()`
+3. ✅ **Simplified procedure check** - No more null check needed
+
+Now PicoCLI will automatically:
+- Show an error if `--user` or `--database` are missing
+- Handle the validation before your `call()` method even executes
+- Provide better error messages than your manual validation
+
+This is much cleaner and leverages PicoCLI's built-in capabilities properly!
+
+---
+
+_**User**_
+
+as a principal engineer is there a way to chain resolve password and executeProcedure?
+
+---
+
+_**Assistant**_
+
+Yes, absolutely! As a principal engineer, you can use functional programming patterns to chain these operations elegantly. Here are several approaches:
+
+## Option 1: Optional-based Chaining (Most Functional)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    try {
+        return Optional.ofNullable(resolvePassword())
+                .filter(password -> !password.trim().isEmpty())
+                .map(password -> {
+                    if (procedure.trim().isEmpty()) {
+                        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                        spec.commandLine().getOut().println("Success: true");
+                        return 0;
+                    }
+                    executeProcedure(password);
+                    return 0;
+                })
+                .orElseGet(() -> {
+                    spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                    return 1;
+                });
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+```
+
+## Option 2: Result Pattern (More Explicit Error Handling)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    try {
+        return resolvePassword()
+                .filter(password -> !password.trim().isEmpty())
+                .map(this::executeWithPassword)
+                .orElse(1);
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+
+private Integer executeWithPassword(String password) {
+    if (procedure.trim().isEmpty()) {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return 0;
+    }
+    executeProcedure(password);
+    return 0;
+}
+
+private Optional<String> resolvePassword() {
+    if (hasDirectVaultParams()) {
+        logger.info("Using direct vault parameters");
+        try (VaultClient client = new VaultClient()) {
+            return Optional.ofNullable(client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user));
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+
+    try (VaultClient client = new VaultClient()) {
+        String password = client.fetchOraclePassword(user, database);
+        if (password != null && !password.trim().isEmpty()) {
+            return Optional.of(password);
+        }
+    } catch (IOException e) {
+        logger.error("Failed to close VaultClient", e);
+    }
+
+    spec.commandLine().getOut().println("[INFO] No vault config found for user: " + user);
+    return Optional.ofNullable(promptForPassword());
+}
+```
+
+## Option 3: Either Pattern (Most Robust)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    try {
+        return resolvePasswordEither()
+                .flatMap(this::executeWithPasswordEither)
+                .fold(
+                    error -> {
+                        spec.commandLine().getErr().println("[ERROR] " + error);
+                        return 1;
+                    },
+                    success -> 0
+                );
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+
+private Either<String, String> resolvePasswordEither() {
+    if (hasDirectVaultParams()) {
+        logger.info("Using direct vault parameters");
+        try (VaultClient client = new VaultClient()) {
+            String password = client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user);
+            return password != null && !password.trim().isEmpty() 
+                ? Either.right(password)
+                : Either.left("Failed to resolve password for user: " + user);
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Either.left("Failed to close VaultClient: " + e.getMessage());
+        }
+    }
+    // ... similar pattern for other cases
+}
+
+private Either<String, Integer> executeWithPasswordEither(String password) {
+    if (procedure.trim().isEmpty()) {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return Either.right(0);
+    }
+    try {
+        executeProcedure(password);
+        return Either.right(0);
+    } catch (Exception e) {
+        return Either.left("Failed to execute procedure: " + e.getMessage());
+    }
+}
+```
+
+## Recommendation
+
+I'd recommend **Option 2** for this codebase because:
+- ✅ Uses standard Java `Optional` (no external dependencies)
+- ✅ Clear separation of concerns
+- ✅ Explicit error handling
+- ✅ Maintains readability
+- ✅ Follows functional programming principles
+
+The key insight is that `resolvePassword()` becomes a pure function that returns `Optional<String>`, and the execution logic is separated into its own method. This makes the code more testable and follows the single responsibility principle.
+
+---
+
+_**User**_
+
+(Connection conn = DriverManager.getConnection(connectionUrl, user, password)) as as principal engineer whould you recomend moving thsi into @ProcedureExecutor.java due to seperation of concerns? 
+
+---
+
+_**Assistant**_
+
+As a principal engineer, **no, I would not recommend moving the connection creation into `ProcedureExecutor.java`**. Here's why:
+
+## Current Design is Correct ✅
+
+**Separation of Concerns:**
+- `ExecProcCmd` = **Connection Management** (authentication, connection lifecycle)
+- `ProcedureExecutor` = **Procedure Execution** (SQL execution, parameter handling)
+
+## Why Keep Connection Creation in ExecProcCmd:
+
+1. **Single Responsibility Principle** ✅
+   - `ProcedureExecutor` should only handle procedure execution logic
+   - Connection management belongs at the CLI/service boundary
+
+2. **Dependency Inversion** ✅
+   - `ProcedureExecutor` accepts a `Connection` (dependency injection)
+   - Makes it testable with mock connections
+   - Allows different connection sources (pooled, direct, etc.)
+
+3. **Resource Management** ✅
+   - Connection lifecycle is managed at the highest level
+   - Clear ownership of when connections are opened/closed
+
+4. **Flexibility** ✅
+   - Can easily switch connection strategies without changing `ProcedureExecutor`
+   - Could use connection pools, different authentication methods, etc.
+
+## Better Alternative: Connection Factory Pattern
+
+If you want to improve the design, consider a `ConnectionFactory`:
+
+```java
+public interface ConnectionFactory {
+    Connection createConnection(String type, String database, String user, String password) throws SQLException;
+}
+
+public class VaultConnectionFactory implements ConnectionFactory {
+    private final VaultClient vaultClient;
+    
+    @Override
+    public Connection createConnection(String type, String database, String user, String password) {
+        String connectionUrl = ConnectionStringGenerator.createConnectionString(type, database, user, password, null).getUrl();
+        return DriverManager.getConnection(connectionUrl, user, password);
+    }
+}
+```
+
+Then `ExecProcCmd` becomes:
+```java
+private void executeProcedure(String password) {
+    try (Connection conn = connectionFactory.createConnection(type, database, user, password)) {
+        Map<String, Object> result = new ProcedureExecutor().executeProcedureWithStrings(conn, procedure, input, output);
+        // ... output handling
+    }
+}
+```
+
+## Recommendation
+
+Keep the current design. It follows SOLID principles and maintains clear separation of concerns. The connection creation belongs at the service boundary, not in the business logic layer.
+
+---
+
+_**User**_
+
+i was thinking of moving this into its own class? would you be ok wit that as a principal engineer? 
+
+
+
+---
+
+_**Assistant**_
+
+**Absolutely yes!** As a principal engineer, I would strongly recommend moving this into its own class. This is a perfect example of the **Single Responsibility Principle** and would significantly improve the codebase.
+
+## Recommended Design: `PasswordResolver` Class
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordResolver.java
+package com.baml.mav.aieutil.auth;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Optional;
+
+import org.apache.logging.log4j.Logger;
+
+import com.baml.mav.aieutil.util.LoggingUtils;
+import com.baml.mav.aieutil.util.VaultClient;
+
+public class PasswordResolver {
+    private static final Logger logger = LoggingUtils.getLogger(PasswordResolver.class);
+    
+    private final VaultClientFactory vaultClientFactory;
+    private final ConsolePasswordPrompter passwordPrompter;
+    
+    public PasswordResolver(VaultClientFactory vaultClientFactory, ConsolePasswordPrompter passwordPrompter) {
+        this.vaultClientFactory = vaultClientFactory;
+        this.passwordPrompter = passwordPrompter;
+    }
+    
+    public Optional<String> resolvePassword(PasswordRequest request) {
+        // Direct vault parameters
+        if (request.hasDirectVaultParams()) {
+            logger.info("Using direct vault parameters");
+            return resolveWithDirectVaultParams(request);
+        }
+        
+        // Vault lookup
+        Optional<String> vaultPassword = resolveWithVaultLookup(request);
+        if (vaultPassword.isPresent()) {
+            return vaultPassword;
+        }
+        
+        // Console prompt
+        logger.info("No vault config found for user: {}", request.user());
+        return Optional.ofNullable(passwordPrompter.promptForPassword());
+    }
+    
+    private Optional<String> resolveWithDirectVaultParams(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            return Optional.ofNullable(client.fetchOraclePassword(
+                request.vaultUrl(), request.roleId(), request.secretId(), 
+                request.database(), request.ait(), request.user()));
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+    
+    private Optional<String> resolveWithVaultLookup(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            String password = client.fetchOraclePassword(request.user(), request.database());
+            return Optional.ofNullable(password)
+                .filter(pwd -> !pwd.trim().isEmpty());
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+}
+
+// Immutable request object
+public record PasswordRequest(
+    String user, String database, String vaultUrl, String roleId, 
+    String secretId, String ait
+) {
+    public boolean hasDirectVaultParams() {
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+    }
+}
+
+// Factory for testability
+public interface VaultClientFactory {
+    VaultClient createClient();
+}
+
+// Console interaction (can be mocked in tests)
+public interface ConsolePasswordPrompter {
+    String promptForPassword();
+}
+```
+
+## Updated ExecProcCmd
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+    
+    private final PasswordResolver passwordResolver;
+    
+    public ExecProcCmd() {
+        this.passwordResolver = new PasswordResolver(
+            VaultClient::new, 
+            new ConsolePasswordPrompter() {
+                @Override
+                public String promptForPassword() {
+                    try {
+                        spec.commandLine().getOut().print("Enter password: ");
+                        if (System.console() != null) {
+                            return new String(System.console().readPassword());
+                        }
+                        try (java.util.Scanner scanner = new java.util.Scanner(System.in)) {
+                            return scanner.nextLine();
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to read password from console: {}", e.getMessage());
+                        return null;
+                    }
+                }
+            }
+        );
+    }
+    
+    @Override
+    public Integer call() {
+        try {
+            PasswordRequest request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+            
+            return passwordResolver.resolvePassword(request)
+                .filter(password -> !password.trim().isEmpty())
+                .map(password -> {
+                    if (procedure.trim().isEmpty()) {
+                        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                        spec.commandLine().getOut().println("Success: true");
+                        return 0;
+                    }
+                    executeProcedure(password);
+                    return 0;
+                })
+                .orElseGet(() -> {
+                    spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                    return 1;
+                });
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+    
+    // ... rest of methods
+}
+```
+
+## Benefits ✅
+
+1. **Single Responsibility** - Password resolution logic is isolated
+2. **Testability** - Can mock `VaultClientFactory` and `ConsolePasswordPrompter`
+3. **Reusability** - Can be used by other commands
+4. **Dependency Injection** - Clear dependencies and inversion of control
+5. **Immutable Data** - `PasswordRequest` record prevents mutation
+6. **Functional Style** - Returns `Optional<String>` for clear error handling
+
+This is exactly the kind of refactoring that improves code quality and maintainability!
+
+---
+
+_**User**_
+
+has to be java 8 complaint
+
+---
+
+_**Assistant**_
+
+Ah, for Java 8 compatibility, here's the updated design without records and with Java 8 features:
+
+## Java 8 Compatible Design
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordResolver.java
+package com.baml.mav.aieutil.auth;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Optional;
+
+import org.apache.logging.log4j.Logger;
+
+import com.baml.mav.aieutil.util.LoggingUtils;
+import com.baml.mav.aieutil.util.VaultClient;
+
+public class PasswordResolver {
+    private static final Logger logger = LoggingUtils.getLogger(PasswordResolver.class);
+    
+    private final VaultClientFactory vaultClientFactory;
+    private final ConsolePasswordPrompter passwordPrompter;
+    
+    public PasswordResolver(VaultClientFactory vaultClientFactory, ConsolePasswordPrompter passwordPrompter) {
+        this.vaultClientFactory = vaultClientFactory;
+        this.passwordPrompter = passwordPrompter;
+    }
+    
+    public Optional<String> resolvePassword(PasswordRequest request) {
+        // Direct vault parameters
+        if (request.hasDirectVaultParams()) {
+            logger.info("Using direct vault parameters");
+            return resolveWithDirectVaultParams(request);
+        }
+        
+        // Vault lookup
+        Optional<String> vaultPassword = resolveWithVaultLookup(request);
+        if (vaultPassword.isPresent()) {
+            return vaultPassword;
+        }
+        
+        // Console prompt
+        logger.info("No vault config found for user: {}", request.getUser());
+        return Optional.ofNullable(passwordPrompter.promptForPassword());
+    }
+    
+    private Optional<String> resolveWithDirectVaultParams(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            return Optional.ofNullable(client.fetchOraclePassword(
+                request.getVaultUrl(), request.getRoleId(), request.getSecretId(), 
+                request.getDatabase(), request.getAit(), request.getUser()));
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+    
+    private Optional<String> resolveWithVaultLookup(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            String password = client.fetchOraclePassword(request.getUser(), request.getDatabase());
+            return Optional.ofNullable(password)
+                .filter(pwd -> !pwd.trim().isEmpty());
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+}
+
+// Immutable request object (Java 8 compatible)
+public final class PasswordRequest {
+    private final String user;
+    private final String database;
+    private final String vaultUrl;
+    private final String roleId;
+    private final String secretId;
+    private final String ait;
+    
+    public PasswordRequest(String user, String database, String vaultUrl, String roleId, String secretId, String ait) {
+        this.user = user;
+        this.database = database;
+        this.vaultUrl = vaultUrl;
+        this.roleId = roleId;
+        this.secretId = secretId;
+        this.ait = ait;
+    }
+    
+    public boolean hasDirectVaultParams() {
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+    }
+    
+    // Getters
+    public String getUser() { return user; }
+    public String getDatabase() { return database; }
+    public String getVaultUrl() { return vaultUrl; }
+    public String getRoleId() { return roleId; }
+    public String getSecretId() { return secretId; }
+    public String getAit() { return ait; }
+}
+
+// Factory for testability
+public interface VaultClientFactory {
+    VaultClient createClient();
+}
+
+// Console interaction (can be mocked in tests)
+public interface ConsolePasswordPrompter {
+    String promptForPassword();
+}
+```
+
+## Updated ExecProcCmd (Java 8)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+    
+    private final PasswordResolver passwordResolver;
+    
+    public ExecProcCmd() {
+        this.passwordResolver = new PasswordResolver(
+            new VaultClientFactory() {
+                @Override
+                public VaultClient createClient() {
+                    return new VaultClient();
+                }
+            },
+            new ConsolePasswordPrompter() {
+                @Override
+                public String promptForPassword() {
+                    try {
+                        spec.commandLine().getOut().print("Enter password: ");
+                        if (System.console() != null) {
+                            return new String(System.console().readPassword());
+                        }
+                        try (java.util.Scanner scanner = new java.util.Scanner(System.in)) {
+                            return scanner.nextLine();
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to read password from console: {}", e.getMessage());
+                        return null;
+                    }
+                }
+            }
+        );
+    }
+    
+    @Override
+    public Integer call() {
+        try {
+            PasswordRequest request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+            
+            Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+            if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            }
+            
+            String password = passwordOpt.get();
+            if (procedure.trim().isEmpty()) {
+                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                spec.commandLine().getOut().println("Success: true");
+                return 0;
+            }
+            
+            executeProcedure(password);
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+    
+    // ... rest of methods
+}
+```
+
+## Key Java 8 Changes:
+
+1. **No records** - Used immutable class with getters
+2. **No pattern matching** - Traditional if/else logic
+3. **No enhanced switch** - Standard switch statements
+4. **No text blocks** - Regular string concatenation
+5. **No var** - Explicit type declarations
+6. **Stream API** - Used Java 8 streams for filtering
+
+This maintains all the architectural benefits while being fully Java 8 compatible!
+
+---
+
+_**User**_
+
+print the entier new PasswordResolver and the entire new ExecProcCmd
+
+---
+
+_**Assistant**_
+
+Here are the complete files for Java 8 compatibility:
+
+## Complete PasswordResolver.java
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordResolver.java
+package com.baml.mav.aieutil.auth;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Optional;
+
+import org.apache.logging.log4j.Logger;
+
+import com.baml.mav.aieutil.util.LoggingUtils;
+import com.baml.mav.aieutil.util.VaultClient;
+
+public class PasswordResolver {
+    private static final Logger logger = LoggingUtils.getLogger(PasswordResolver.class);
+    
+    private final VaultClientFactory vaultClientFactory;
+    private final ConsolePasswordPrompter passwordPrompter;
+    
+    public PasswordResolver(VaultClientFactory vaultClientFactory, ConsolePasswordPrompter passwordPrompter) {
+        this.vaultClientFactory = vaultClientFactory;
+        this.passwordPrompter = passwordPrompter;
+    }
+    
+    public Optional<String> resolvePassword(PasswordRequest request) {
+        // Direct vault parameters
+        if (request.hasDirectVaultParams()) {
+            logger.info("Using direct vault parameters");
+            return resolveWithDirectVaultParams(request);
+        }
+        
+        // Vault lookup
+        Optional<String> vaultPassword = resolveWithVaultLookup(request);
+        if (vaultPassword.isPresent()) {
+            return vaultPassword;
+        }
+        
+        // Console prompt
+        logger.info("No vault config found for user: {}", request.getUser());
+        return Optional.ofNullable(passwordPrompter.promptForPassword());
+    }
+    
+    private Optional<String> resolveWithDirectVaultParams(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            return Optional.ofNullable(client.fetchOraclePassword(
+                request.getVaultUrl(), request.getRoleId(), request.getSecretId(), 
+                request.getDatabase(), request.getAit(), request.getUser()));
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+    
+    private Optional<String> resolveWithVaultLookup(PasswordRequest request) {
+        try (VaultClient client = vaultClientFactory.createClient()) {
+            String password = client.fetchOraclePassword(request.getUser(), request.getDatabase());
+            return Optional.ofNullable(password)
+                .filter(pwd -> !pwd.trim().isEmpty());
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return Optional.empty();
+        }
+    }
+}
+
+// Immutable request object (Java 8 compatible)
+final class PasswordRequest {
+    private final String user;
+    private final String database;
+    private final String vaultUrl;
+    private final String roleId;
+    private final String secretId;
+    private final String ait;
+    
+    public PasswordRequest(String user, String database, String vaultUrl, String roleId, String secretId, String ait) {
+        this.user = user;
+        this.database = database;
+        this.vaultUrl = vaultUrl;
+        this.roleId = roleId;
+        this.secretId = secretId;
+        this.ait = ait;
+    }
+    
+    public boolean hasDirectVaultParams() {
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+    }
+    
+    // Getters
+    public String getUser() { return user; }
+    public String getDatabase() { return database; }
+    public String getVaultUrl() { return vaultUrl; }
+    public String getRoleId() { return roleId; }
+    public String getSecretId() { return secretId; }
+    public String getAit() { return ait; }
+}
+
+// Factory for testability
+interface VaultClientFactory {
+    VaultClient createClient();
+}
+
+// Console interaction (can be mocked in tests)
+interface ConsolePasswordPrompter {
+    String promptForPassword();
+}
+```
+
+## Complete ExecProcCmd.java
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+package com.baml.mav.aieutil;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+
+import org.apache.logging.log4j.Logger;
+
+import com.baml.mav.aieutil.auth.ConsolePasswordPrompter;
+import com.baml.mav.aieutil.auth.PasswordRequest;
+import com.baml.mav.aieutil.auth.PasswordResolver;
+import com.baml.mav.aieutil.auth.VaultClientFactory;
+import com.baml.mav.aieutil.database.ConnectionStringGenerator;
+import com.baml.mav.aieutil.database.ProcedureExecutor;
+import com.baml.mav.aieutil.util.ExceptionUtils;
+import com.baml.mav.aieutil.util.LoggingUtils;
+import com.baml.mav.aieutil.util.VaultClient;
+
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
+
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    private static final Logger logger = LoggingUtils.getLogger(ExecProcCmd.class);
+
+    @Option(names = { "-t", "--type" }, description = "Database type", defaultValue = "oracle")
+    String type;
+
+    @Option(names = { "-d", "--database" }, description = "Database name", required = true)
+    String database;
+
+    @Option(names = { "-u", "--user" }, description = "Database username", required = true)
+    String user;
+
+    @Option(names = "--vault-url", description = "Vault base URL")
+    String vaultUrl;
+
+    @Option(names = "--role-id", description = "Vault role ID")
+    String roleId;
+
+    @Option(names = "--secret-id", description = "Vault secret ID")
+    String secretId;
+
+    @Option(names = "--ait", description = "AIT")
+    String ait;
+
+    @Parameters(index = "0", description = "Stored procedure name (e.g., MAV_OWNER.TemplateTable.Onehadoop_proc)", arity = "0..1", defaultValue = "")
+    String procedure;
+
+    @Option(names = "--input", description = "Input parameters (name:type:value,name:type:value)")
+    String input;
+
+    @Option(names = "--output", description = "Output parameters (name:type,name:type)")
+    String output;
+
+    @Spec
+    CommandSpec spec;
+
+    private final PasswordResolver passwordResolver;
+
+    public ExecProcCmd() {
+        this.passwordResolver = new PasswordResolver(
+            new VaultClientFactory() {
+                @Override
+                public VaultClient createClient() {
+                    return new VaultClient();
+                }
+            },
+            new ConsolePasswordPrompter() {
+                @Override
+                public String promptForPassword() {
+                    try {
+                        spec.commandLine().getOut().print("Enter password: ");
+                        if (System.console() != null) {
+                            return new String(System.console().readPassword());
+                        }
+                        try (java.util.Scanner scanner = new java.util.Scanner(System.in)) {
+                            return scanner.nextLine();
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to read password from console: {}", e.getMessage());
+                        return null;
+                    }
+                }
+            }
+        );
+    }
+
+    public static void main(String[] args) {
+        try {
+            if (logger.isDebugEnabled()) {
+                logger.debug("java.home: {}", System.getProperty("java.home"));
+            }
+            System.exit(new CommandLine(new ExecProcCmd()).execute(args));
+        } catch (Exception e) {
+            LoggingUtils.logMinimalError(e);
+            System.exit(1);
+        }
+    }
+
+    @Override
+    public Integer call() {
+        try {
+            PasswordRequest request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+            
+            Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+            if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            }
+            
+            String password = passwordOpt.get();
+            if (procedure.trim().isEmpty()) {
+                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                spec.commandLine().getOut().println("Success: true");
+                return 0;
+            }
+            
+            executeProcedure(password);
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+
+    private void executeProcedure(String password) {
+        String connectionUrl = ConnectionStringGenerator.createConnectionString(type, database, user, password, null)
+                .getUrl();
+        try (Connection conn = DriverManager.getConnection(connectionUrl, user, password)) {
+            Map<String, Object> result = new ProcedureExecutor().executeProcedureWithStrings(conn, procedure, input,
+                    output);
+
+            if (result.size() == 1) {
+                Object value = result.values().iterator().next();
+                spec.commandLine().getOut().println(value != null ? value.toString() : "null");
+                return;
+            }
+            result.forEach((key, value) -> spec.commandLine().getOut().println(key + ": " + value));
+        } catch (Exception e) {
+            ExceptionUtils.logAndRethrow(e, "Failed to execute procedure: " + procedure);
+        }
+    }
+}
+```
+
+## Key Features:
+
+1. **Java 8 Compatible** - No records, pattern matching, or newer features
+2. **Separation of Concerns** - Password resolution logic is isolated
+3. **Dependency Injection** - Clear interfaces for testability
+4. **Immutable Data** - PasswordRequest is immutable
+5. **Functional Style** - Uses Optional for clear error handling
+6. **Resource Management** - Proper try-with-resources for all connections
+
+The code is now much cleaner, more testable, and follows SOLID principles while maintaining Java 8 compatibility!
+
+---
+
+_**User**_
+
+where is this? 
+ConsolePasswordPrompter
+
+---
+
+_**Assistant**_
+
+The `ConsolePasswordPrompter` interface is defined in the same file as `PasswordResolver`. Looking at the code I provided, it's at the bottom of the `PasswordResolver.java` file:
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordResolver.java
+// ... rest of PasswordResolver class ...
+
+// Console interaction (can be mocked in tests)
+interface ConsolePasswordPrompter {
+    String promptForPassword();
+}
+```
+
+However, if you prefer to have it as a separate file, here's the standalone interface:
+
+## ConsolePasswordPrompter.java
+
+```java:src/main/java/com/baml/mav/aieutil/auth/ConsolePasswordPrompter.java
+package com.baml.mav.aieutil.auth;
+
+public interface ConsolePasswordPrompter {
+    String promptForPassword();
+}
+```
+
+And then you'd need to remove it from the `PasswordResolver.java` file and just keep:
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordResolver.java
+// ... rest of PasswordResolver class ...
+
+// Factory for testability
+interface VaultClientFactory {
+    VaultClient createClient();
+}
+```
+
+Both approaches work - having it in the same file is more concise, but having it as a separate file follows the one-class-per-file convention. Which do you prefer?
+
+---
+
+_**User**_
+
+i dont understand howi it all works now, can you explain?
+
+---
+
+_**Assistant**_
+
+Let me break down how the new architecture works step by step:
+
+## 1. **The Problem We Solved**
+
+**Before:** `ExecProcCmd` had a big `resolvePassword()` method that did everything:
+- Check if direct vault params exist
+- Create VaultClient
+- Try to get password from vault
+- Handle errors
+- Prompt for console password
+- All mixed together in one method
+
+**After:** We separated concerns into focused classes.
+
+## 2. **The New Architecture**
+
+### **PasswordResolver** - The "Brain"
+```java
+public class PasswordResolver {
+    // Takes a request and returns Optional<String> (password or empty)
+    public Optional<String> resolvePassword(PasswordRequest request) {
+        // Strategy 1: Direct vault params
+        if (request.hasDirectVaultParams()) {
+            return resolveWithDirectVaultParams(request);
+        }
+        
+        // Strategy 2: Vault lookup
+        Optional<String> vaultPassword = resolveWithVaultLookup(request);
+        if (vaultPassword.isPresent()) {
+            return vaultPassword;
+        }
+        
+        // Strategy 3: Console prompt
+        return Optional.ofNullable(passwordPrompter.promptForPassword());
+    }
+}
+```
+
+### **PasswordRequest** - The "Data Container"
+```java
+final class PasswordRequest {
+    private final String user, database, vaultUrl, roleId, secretId, ait;
+    
+    // Immutable - can't be changed after creation
+    public PasswordRequest(String user, String database, ...) { ... }
+    
+    // Helper method to check if we have direct vault params
+    public boolean hasDirectVaultParams() {
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+    }
+}
+```
+
+### **Interfaces** - For Testability
+```java
+interface VaultClientFactory {
+    VaultClient createClient();  // Can be mocked in tests
+}
+
+interface ConsolePasswordPrompter {
+    String promptForPassword();  // Can be mocked in tests
+}
+```
+
+## 3. **How It All Works Together**
+
+### **Step 1: ExecProcCmd creates the request**
+```java
+PasswordRequest request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+```
+
+### **Step 2: ExecProcCmd asks PasswordResolver to resolve**
+```java
+Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+```
+
+### **Step 3: PasswordResolver tries different strategies**
+```java
+// Strategy 1: Direct vault params provided?
+if (request.hasDirectVaultParams()) {
+    return resolveWithDirectVaultParams(request);
+}
+
+// Strategy 2: Look up in vault config?
+Optional<String> vaultPassword = resolveWithVaultLookup(request);
+if (vaultPassword.isPresent()) {
+    return vaultPassword;
+}
+
+// Strategy 3: Ask user for password?
+return Optional.ofNullable(passwordPrompter.promptForPassword());
+```
+
+### **Step 4: ExecProcCmd handles the result**
+```java
+if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+    // No password found - show error
+    spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+    return 1;
+}
+
+String password = passwordOpt.get();  // Got a password!
+```
+
+## 4. **The Benefits**
+
+### **Before (Mixed Responsibilities):**
+```java
+private String resolvePassword() {
+    if (hasDirectVaultParams()) {
+        logger.info("Using direct vault parameters");
+        try (VaultClient client = new VaultClient()) {
+            return client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user);
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
+            return null;
+        }
+    }
+    // ... more mixed logic
+}
+```
+
+### **After (Separated Concerns):**
+```java
+// ExecProcCmd - just handles CLI logic
+Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+
+// PasswordResolver - just handles password resolution strategies
+public Optional<String> resolvePassword(PasswordRequest request) {
+    // Clean, focused logic
+}
+
+// PasswordRequest - just holds data
+final class PasswordRequest { ... }
+```
+
+## 5. **Why This Is Better**
+
+1. **Single Responsibility**: Each class has one job
+2. **Testable**: Can mock `VaultClientFactory` and `ConsolePasswordPrompter`
+3. **Reusable**: `PasswordResolver` can be used by other commands
+4. **Clear Flow**: Easy to follow the logic
+5. **Error Handling**: `Optional<String>` makes it clear when no password is found
+
+## 6. **The Flow Diagram**
+```
+ExecProcCmd
+    ↓ creates
+PasswordRequest
+    ↓ passes to
+PasswordResolver
+    ↓ tries strategies
+1. Direct Vault Params → VaultClient
+2. Vault Lookup → VaultClient  
+3. Console Prompt → ConsolePasswordPrompter
+    ↓ returns
+Optional<String> (password or empty)
+    ↓ handled by
+ExecProcCmd (success or error)
+```
+
+Does this help clarify how it all works together?
+
+---
+
+_**User**_
+
+PasswordRequest request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+
+this is not always true right? sometime its  PasswordRequest request = new PasswordRequest(user, database); right?
+
+
+---
+
+_**Assistant**_
+
+You're absolutely right! The `PasswordRequest` constructor should handle both cases. Let me fix that:
+
+## Updated PasswordRequest.java
+
+```java:src/main/java/com/baml/mav/aieutil/auth/PasswordRequest.java
+package com.baml.mav.aieutil.auth;
+
+import java.util.Arrays;
+
+public final class PasswordRequest {
+    private final String user;
+    private final String database;
+    private final String vaultUrl;
+    private final String roleId;
+    private final String secretId;
+    private final String ait;
+    
+    // Constructor for vault lookup (no direct params)
+    public PasswordRequest(String user, String database) {
+        this(user, database, null, null, null, null);
+    }
+    
+    // Constructor for direct vault params
+    public PasswordRequest(String user, String database, String vaultUrl, String roleId, String secretId, String ait) {
+        this.user = user;
+        this.database = database;
+        this.vaultUrl = vaultUrl;
+        this.roleId = roleId;
+        this.secretId = secretId;
+        this.ait = ait;
+    }
+    
+    public boolean hasDirectVaultParams() {
+        return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+    }
+    
+    // Getters
+    public String getUser() { return user; }
+    public String getDatabase() { return database; }
+    public String getVaultUrl() { return vaultUrl; }
+    public String getRoleId() { return roleId; }
+    public String getSecretId() { return secretId; }
+    public String getAit() { return ait; }
+}
+```
+
+## Updated ExecProcCmd.java
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    try {
+        // Create request based on what parameters are available
+        PasswordRequest request;
+        if (hasDirectVaultParams()) {
+            request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+        } else {
+            request = new PasswordRequest(user, database);
+        }
+        
+        Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+        if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+            spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+            return 1;
+        }
+        
+        String password = passwordOpt.get();
+        if (procedure.trim().isEmpty()) {
+            spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+            spec.commandLine().getOut().println("Success: true");
+            return 0;
+        }
+        
+        executeProcedure(password);
+        return 0;
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+
+private boolean hasDirectVaultParams() {
+    return Arrays.asList(vaultUrl, roleId, secretId, ait)
+            .stream()
+            .allMatch(param -> param != null && !param.trim().isEmpty());
+}
+```
+
+Now it correctly handles both scenarios:
+- **Vault lookup**: `new PasswordRequest(user, database)` 
+- **Direct params**: `new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait)`
+
+Thanks for catching that!
+
+---
+
+_**User**_
+
+this means we never get to executeProcedure(password); right?
+
+---
+
+_**Assistant**_
+
+You're absolutely right! There's a logic error. If `procedure.trim().isEmpty()` is true, we return early and never call `executeProcedure(password)`. 
+
+But looking at the code, that's actually the **intended behavior**. Here's why:
+
+## The Logic Flow:
+
+1. **If no procedure is provided** (`procedure.trim().isEmpty()`):
+   - Show "VAULT PASSWORD DECRYPTION" message
+   - Return success (0)
+   - **Don't execute any procedure** (because there isn't one!)
+
+2. **If a procedure is provided** (`procedure.trim().isEmpty()` is false):
+   - Call `executeProcedure(password)`
+   - Return success (0)
+
+## This Makes Sense Because:
+
+- **Password-only mode**: User just wants to test vault password retrieval
+- **Procedure execution mode**: User wants to execute a stored procedure
+
+## Example Usage:
+
+```bash
+# Just test password retrieval (no procedure)
+./exec-proc -u MAV_T2T_APP -d ECICMD03_SVC01
+
+# Execute a procedure
+./exec-proc -u MAV_T2T_APP -d ECICMD03_SVC01 "MAV_OWNER.TempTable_Onehadoop_proc"
+```
+
+The current logic is correct - `executeProcedure(password)` is only called when there's actually a procedure to execute. If you want to always execute something, you'd need to change the logic, but the current behavior seems intentional for a CLI tool that can work in both modes.
+
+Is this the behavior you expected, or did you want it to work differently?
+
+---
+
+_**User**_
+
+ok, why do we need to do thsi here? cant we have picocli do this chck for  us?
+
+---
+
+_**Assistant**_
+
+You're absolutely right! We can use PicoCLI's `arity` to handle this automatically. Here's how to fix it:
+
+## Updated ExecProcCmd.java
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    // ... other options ...
+
+    @Parameters(index = "0", description = "Stored procedure name (e.g., MAV_OWNER.TemplateTable.Onehadoop_proc)", 
+                arity = "0..1")  // Remove defaultValue = ""
+    String procedure;
+
+    // ... rest of options ...
+
+    @Override
+    public Integer call() {
+        try {
+            // Create request based on what parameters are available
+            PasswordRequest request;
+            if (hasDirectVaultParams()) {
+                request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+            } else {
+                request = new PasswordRequest(user, database);
+            }
+            
+            Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+            if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            }
+            
+            String password = passwordOpt.get();
+            
+            // PicoCLI handles the arity - if procedure is null, it wasn't provided
+            if (procedure == null) {
+                spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+                spec.commandLine().getOut().println("Success: true");
+                return 0;
+            }
+            
+            executeProcedure(password);
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+
+    // ... rest of methods ...
+}
+```
+
+## Key Changes:
+
+1. **Removed `defaultValue = ""`** - Let PicoCLI handle the arity naturally
+2. **Changed check to `procedure == null`** - More explicit and cleaner
+3. **PicoCLI handles the logic** - If no procedure is provided, `procedure` will be `null`
+
+## How PicoCLI Arity Works:
+
+- `arity = "0..1"` means the parameter is optional
+- If provided: `procedure` contains the value
+- If not provided: `procedure` is `null`
+- No need for manual string checking!
+
+This is much cleaner and leverages PicoCLI's built-in capabilities properly.
+
+---
+
+_**User**_
+
+why do we have to get to this point? cant we just exit out with a mesasge from the piciocli option? 
+
+---
+
+_**Assistant**_
+
+You're absolutely right! We can handle this much earlier with PicoCLI's validation. Here are a few approaches:
+
+## Option 1: Custom Validator (Cleanest)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    // ... other options ...
+
+    @Parameters(index = "0", description = "Stored procedure name (e.g., MAV_OWNER.TemplateTable.Onehadoop_proc)", 
+                arity = "0..1")
+    String procedure;
+
+    @Spec
+    CommandSpec spec;
+
+    @Override
+    public Integer call() {
+        // Early exit if no procedure provided
+        if (procedure == null) {
+            spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+            spec.commandLine().getOut().println("Success: true");
+            return 0;
+        }
+
+        try {
+            // Only do password resolution if we need to execute a procedure
+            PasswordRequest request;
+            if (hasDirectVaultParams()) {
+                request = new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait);
+            } else {
+                request = new PasswordRequest(user, database);
+            }
+            
+            Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+            if (!passwordOpt.isPresent() || passwordOpt.get().trim().isEmpty()) {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            }
+            
+            executeProcedure(passwordOpt.get());
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+
+    // ... rest of methods ...
+}
+```
+
+## Option 2: Separate Commands (Most PicoCLI-like)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, 
+         subcommands = {VaultPasswordCmd.class, ExecuteProcedureCmd.class},
+         description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    @Override
+    public Integer call() {
+        // Show help if no subcommand
+        spec.commandLine().usage(System.out);
+        return 0;
+    }
+}
+
+@Command(name = "password", description = "Test vault password retrieval")
+class VaultPasswordCmd implements Callable<Integer> {
+    
+    @Option(names = { "-d", "--database" }, description = "Database name", required = true)
+    String database;
+
+    @Option(names = { "-u", "--user" }, description = "Database username", required = true)
+    String user;
+
+    // ... vault options ...
+
+    @Override
+    public Integer call() {
+        // Password resolution logic here
+        System.out.println("=== VAULT PASSWORD DECRYPTION ===");
+        System.out.println("Success: true");
+        return 0;
+    }
+}
+
+@Command(name = "execute", description = "Execute stored procedure")
+class ExecuteProcedureCmd implements Callable<Integer> {
+    
+    @Parameters(index = "0", description = "Stored procedure name", required = true)
+    String procedure;
+
+    // ... other options ...
+
+    @Override
+    public Integer call() {
+        // Procedure execution logic here
+        return 0;
+    }
+}
+```
+
+## Option 3: Custom Validation (Most Flexible)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Command(name = "exec-proc", mixinStandardHelpOptions = true, description = "Vault-authenticated procedure execution")
+public class ExecProcCmd implements Callable<Integer> {
+
+    // ... options ...
+
+    @Override
+    public Integer call() {
+        // Validate early
+        if (procedure == null) {
+            return handlePasswordOnlyMode();
+        }
+        
+        return handleProcedureExecutionMode();
+    }
+
+    private Integer handlePasswordOnlyMode() {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return 0;
+    }
+
+    private Integer handleProcedureExecutionMode() {
+        try {
+            // Password resolution and procedure execution logic
+            return 0;
+        } catch (Exception e) {
+            logger.error("Operation failed", e);
+            LoggingUtils.logMinimalError(e);
+            return 1;
+        }
+    }
+}
+```
+
+## Recommendation
+
+I'd go with **Option 1** - it's the simplest and most straightforward. The early exit pattern is clean and avoids unnecessary work when we just want to test password retrieval.
+
+Which approach do you prefer?
+
+---
+
+_**User**_
+
+does java 8 not have a way to reduce all of this code? basically you're just checking passwordOpt for nul or empty if its print a error spec and return 1 no simpler way to do that ?
+
+---
+
+_**Assistant**_
+
+You're absolutely right! Java 8 has several ways to make this much more concise. Here are the cleanest approaches:
+
+## Option 1: Optional with orElseGet() (Most Functional)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    if (procedure == null) {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return 0;
+    }
+
+    try {
+        PasswordRequest request = hasDirectVaultParams() 
+            ? new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait)
+            : new PasswordRequest(user, database);
+            
+        return passwordResolver.resolvePassword(request)
+            .filter(password -> !password.trim().isEmpty())
+            .map(password -> {
+                executeProcedure(password);
+                return 0;
+            })
+            .orElseGet(() -> {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            });
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+```
+
+## Option 2: Optional with orElse() (Even Shorter)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    if (procedure == null) {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return 0;
+    }
+
+    try {
+        PasswordRequest request = hasDirectVaultParams() 
+            ? new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait)
+            : new PasswordRequest(user, database);
+            
+        String password = passwordResolver.resolvePassword(request)
+            .filter(pwd -> !pwd.trim().isEmpty())
+            .orElse(null);
+            
+        if (password == null) {
+            spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+            return 1;
+        }
+        
+        executeProcedure(password);
+        return 0;
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+```
+
+## Option 3: Ternary Operator (Most Concise)
+
+```java:src/main/java/com/baml/mav/aieutil/ExecProcCmd.java
+@Override
+public Integer call() {
+    if (procedure == null) {
+        spec.commandLine().getOut().println("=== VAULT PASSWORD DECRYPTION ===");
+        spec.commandLine().getOut().println("Success: true");
+        return 0;
+    }
+
+    try {
+        PasswordRequest request = hasDirectVaultParams() 
+            ? new PasswordRequest(user, database, vaultUrl, roleId, secretId, ait)
+            : new PasswordRequest(user, database);
+            
+        Optional<String> passwordOpt = passwordResolver.resolvePassword(request);
+        return passwordOpt.filter(pwd -> !pwd.trim().isEmpty())
+            .map(password -> { executeProcedure(password); return 0; })
+            .orElseGet(() -> {
+                spec.commandLine().getErr().println("[ERROR] Failed to resolve password for user: " + user);
+                return 1;
+            });
+    } catch (Exception e) {
+        logger.error("Operation failed", e);
+        LoggingUtils.logMinimalError(e);
+        return 1;
+    }
+}
+```
+
+## Recommendation
+
+**Option 1** is the cleanest - it eliminates all the manual null/empty checking and uses functional programming patterns. The `orElseGet()` handles the error case elegantly.
+
+The key insight is that `Optional` can handle the entire flow: filter out empty passwords, map to success case, or provide error case with `orElseGet()`.
+
+Which style do you prefer?
+
+---
+

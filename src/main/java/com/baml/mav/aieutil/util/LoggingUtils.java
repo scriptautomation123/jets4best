@@ -31,6 +31,61 @@ public final class LoggingUtils {
         logger.info("event=connect_url url={}", url);
     }
 
+    public static void logDatabaseConnection(String type, String database, String user) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=database_connection type={} database={} user={}", type, database, user);
+    }
+
+    public static void logProcedureExecution(String procedure, String input, String output) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=procedure_execution procedure={} input={} output={}", procedure, input, output);
+    }
+
+    public static void logProcedureExecutionSuccess(String procedure) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=procedure_execution procedure={} status=SUCCESS", procedure);
+    }
+
+    public static void logPasswordResolution(String user, String method) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=password_resolution user={} method={}", user, method);
+    }
+
+    public static void logPasswordResolutionSuccess(String user, String method) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=password_resolution user={} method={} status=SUCCESS", user, method);
+    }
+
+    public static void logVaultOperation(String operation, String user, String status) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=vault_operation operation={} user={} status={}", operation, user, status);
+    }
+
+    public static void logVaultAuthentication(String vaultUrl, String status) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=vault_authentication vaultUrl={} status={}", vaultUrl, status);
+    }
+
+    public static void logCliStartup(String javaHome) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.debug("event=cli_startup javaHome={}", javaHome);
+    }
+
+    public static void logSqlExecution(String sql, int paramCount) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=sql_execution sql={} paramCount={}", sql, paramCount);
+    }
+
+    public static void logSqlScriptExecution(String scriptName) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=sql_script_execution script={}", scriptName);
+    }
+
+    public static void logConfigLoading(String configPath) {
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=config_loading path={}", configPath);
+    }
+
     public static void logMinimalError(Throwable exception) {
         Logger logger = getLogger(LoggingUtils.class);
         Throwable cause = getRootCause(exception);
@@ -63,7 +118,7 @@ public final class LoggingUtils {
 
     public static void configureMinimalConsoleLogging() {
         Configurator.setRootLevel(Level.ERROR);
-        Configurator.setLevel("com.baml.mav.jdbcsqlrunner", Level.DEBUG);
+        Configurator.setLevel("com.baml.mav.aieutil", Level.DEBUG);
     }
 
     public static String getCallerInfo() {

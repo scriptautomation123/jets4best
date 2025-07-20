@@ -1,0 +1,138 @@
+As a principal engineer, YES, you should absolutely use LoggingUtils instead of direct Log4j calls. This is a critical architectural decision that affects the entire codebase.
+Current Problem: Inconsistent Logging
+Looking at the codebase, there's inconsistent logging patterns:
+❌ Direct Log4j Usage (Scattered Throughout)
+Apply to plan2.txt
+// In ExecProcedureCmd.java
+private static final Logger logger = LoggingUtils.getLogger(ExecProcedureCmd.class);
+logger.debug("java.home: {}", System.getProperty("java.home"));
+
+// In other classes
+private final Logger log = LoggingUtils.getLogger(ProcedureExecutor.class);
+log.info("Executing procedure with string parameters: {}", procFullName);
+✅ Centralized LoggingUtils Usage
+Apply to plan2.txt
+// Should be using LoggingUtils methods consistently
+LoggingUtils.logConnection(dbType, host, port, database);
+LoggingUtils.logMinimalError(exception);
+LoggingUtils.logStructuredError("procedure_execution", "execute", "SUCCESS", "Procedure completed", null);
+Why Centralized Logging is Critical
+1. Consistency Across the Application
+Apply to plan2.txt
+// Current: Inconsistent formats
+logger.info("Creating database connection for user: {} to database: {}", user, database);
+logger.info("event=connect dbType={} host={} port={} database={}", dbType, host, port, database);
+
+// Should be: Consistent structured logging
+LoggingUtils.logConnection(dbType, host, port, database);
+LoggingUtils.logStructuredError("db_connection", "create", "SUCCESS", "Connection established", null);
+2. Centralized Error Handling
+Apply to plan2.txt
+// Current: Scattered error handling
+logger.error("Failed to execute procedure", e);
+System.err.println("[ERROR] " + e.getMessage());
+
+// Should be: Centralized error handling
+LoggingUtils.logMinimalError(e); // Handles both logging AND console output
+3. Structured Logging for Production
+Apply to plan2.txt
+// Current: Free-form messages
+logger.info("Procedure executed successfully");
+
+// Should be: Structured for monitoring systems
+LoggingUtils.logStructuredError("procedure_execution", "execute", "SUCCESS", "Procedure completed", null);
+Recommended Refactoring
+1. Replace Direct Logger Usage
+Apply to plan2.txt
+// Before (in ExecProcedureCmd.java)
+private static final Logger logger = LoggingUtils.getLogger(ExecProcedureCmd.class);
+logger.debug("java.home: {}", System.getProperty("java.home"));
+
+// After
+LoggingUtils.logStructuredError("cli_startup", "main", "INFO", 
+    "Java home: " + System.getProperty("java.home"), null);
+2. Standardize Error Handling
+Apply to plan2.txt
+// Before (scattered throughout)
+} catch (Exception e) {
+    logger.error("Failed to execute procedure", e);
+    return ExceptionUtils.handleCliException(e, "execute procedure", System.err);
+}
+
+// After
+} catch (Exception e) {
+    LoggingUtils.logMinimalError(e);
+    return ExceptionUtils.handleCliException(e, "execute procedure", System.err);
+}
+3. Add Missing LoggingUtils Methods
+Apply to plan2.txt
+// Add these to LoggingUtils.java
+public static void logProcedureExecution(String procedure, String input, String output) {
+    Logger logger = getLogger(LoggingUtils.class);
+    logger.info("event=procedure_execution procedure={} input={} output={}", 
+        procedure, input, output);
+}
+
+public static void logPasswordResolution(String user, String method) {
+    Logger logger = getLogger(LoggingUtils.class);
+    logger.info("event=password_resolution user={} method={}", user, method);
+}
+
+public static void logVaultOperation(String operation, String user, String status) {
+    Logger logger = getLogger(LoggingUtils.class);
+    logger.info("event=vault_operation operation={} user={} status={}", 
+        operation, user, status);
+}
+Benefits of Centralized Logging
+1. Monitoring Integration
+Apply to plan2.txt
+// Structured logs for monitoring systems
+{"event":"procedure_execution","operation":"execute","status":"SUCCESS","procedure":"MAV_OWNER.TEST_PROC"}
+{"event":"password_resolution","user":"MAV_T2T_APP","method":"vault_lookup","status":"SUCCESS"}
+2. Consistent Error Reporting
+Apply to plan2.txt
+Run
+# All errors follow the same format
+[ERROR] Caused by: SQLException: ORA-00942: table or view does not exist (at DatabaseService:45)
+[ERROR] Caused by: ConfigurationException: Failed to load vault config (at VaultClient:123)
+3. Easy Configuration Changes
+Apply to plan2.txt
+// Change logging behavior in one place
+public static void logProcedureExecution(String procedure, String input, String output) {
+    if (isProduction()) {
+        // Production: Minimal logging
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.info("event=procedure_execution procedure={}", procedure);
+    } else {
+        // Development: Verbose logging
+        Logger logger = getLogger(LoggingUtils.class);
+        logger.debug("event=procedure_execution procedure={} input={} output={}", 
+            procedure, input, output);
+    }
+}
+Implementation Strategy
+Phase 1: Add Missing Methods
+Apply to plan2.txt
+// Add to LoggingUtils.java
+public static void logProcedureExecution(String procedure, String input, String output) { ... }
+public static void logPasswordResolution(String user, String method) { ... }
+public static void logVaultOperation(String operation, String user, String status) { ... }
+public static void logDatabaseConnection(String type, String database, String user) { ... }
+Phase 2: Replace Direct Logger Usage
+Apply to plan2.txt
+// Replace throughout codebase
+// Before: logger.info("Executing procedure: {}", procedure);
+// After: LoggingUtils.logProcedureExecution(procedure, input, output);
+Phase 3: Remove Logger Fields
+Apply to plan2.txt
+// Remove these from all classes
+private static final Logger logger = LoggingUtils.getLogger(ClassName.class);
+private final Logger log = LoggingUtils.getLogger(ClassName.class);
+Bottom Line
+YES, you should absolutely centralize all logging through LoggingUtils. This will:
+Improve consistency across the application
+Enable better monitoring with structured logs
+Simplify configuration changes
+Reduce code duplication
+Make the application more professional
+The current mixed approach is technical debt that should be addressed. Centralized logging is a best practice for enterprise applications.

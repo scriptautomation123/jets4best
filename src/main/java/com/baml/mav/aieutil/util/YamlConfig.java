@@ -5,8 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.logging.log4j.Logger;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
@@ -24,11 +22,12 @@ public class YamlConfig {
 
             // Only load from file system, never from classpath
             File configFile = new File(path);
-            Logger logger = LoggingUtils.getLogger(YamlConfig.class);
-            logger.info("Loading config from file system: {}", configFile.getAbsolutePath());
+            LoggingUtils.logConfigLoading(configFile.getAbsolutePath());
 
             return yaml.readValue(configFile, Map.class);
         } catch (Exception e) {
+            LoggingUtils.logStructuredError("config_loading", "load", "FAILED",
+                    "Could not find configuration file: " + path, e);
             throw ExceptionUtils.wrap(
                     e,
                     "Could not find configuration file: " + path + "\n" +
@@ -39,6 +38,10 @@ public class YamlConfig {
     }
 
     public String getRawValue(String key) {
+        if (key == null || key.trim().isEmpty()) {
+            throw new IllegalArgumentException("Configuration key cannot be null or empty");
+        }
+
         String[] parts = key.split("\\.");
         Object current = config;
         for (String part : parts) {
@@ -50,6 +53,11 @@ public class YamlConfig {
             }
         }
         return current != null ? current.toString() : null;
+    }
+
+    public String getRawValue(String key, String defaultValue) {
+        String value = getRawValue(key);
+        return value != null ? value : defaultValue;
     }
 
     public Map<String, Object> getAll() {

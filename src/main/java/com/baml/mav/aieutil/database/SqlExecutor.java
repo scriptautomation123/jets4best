@@ -11,12 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import org.apache.logging.log4j.Logger;
-
 import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;
 
 public class SqlExecutor {
+    private static final String FAILED = "FAILED";
 
     public static class SqlResult {
         private final List<Map<String, Object>> rows;
@@ -85,7 +84,6 @@ public class SqlExecutor {
         }
     }
 
-    private final Logger log = LoggingUtils.getLogger(SqlExecutor.class);
     private final ConnectionSupplier connectionSupplier;
 
     @FunctionalInterface
@@ -98,7 +96,7 @@ public class SqlExecutor {
     }
 
     public SqlResult executeSql(String sql, List<Object> params) throws SQLException {
-        log.info("Executing SQL with parameters: {} | params={}", sql, params);
+        LoggingUtils.logSqlExecution(sql, params.size());
         int placeholderCount = countPlaceholders(sql);
         if (placeholderCount != params.size()) {
             throw new IllegalArgumentException("SQL placeholder count (" + placeholderCount
@@ -116,22 +114,24 @@ public class SqlExecutor {
                 return handleUpdateCount(pstmt.getUpdateCount());
             }
         } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to execute SQL with parameters: " + sql);
-            throw new IllegalStateException("Unreachable");
+            LoggingUtils.logStructuredError("sql_execution", "execute", FAILED,
+                    "Failed to execute SQL with parameters: " + sql, e);
+            throw ExceptionUtils.wrap(e, "Failed to execute SQL with parameters: " + sql);
         }
     }
 
     public void executeSqlScript(String script, Consumer<SqlResult> resultHandler) throws SQLException {
-        log.info("Executing SQL script");
+        LoggingUtils.logSqlScriptExecution("script");
         String[] statements = script.split(";");
 
         for (String sql : statements) {
             if (!sql.trim().isEmpty()) {
-                log.info("Script Statement: {}", sql);
                 try {
                     resultHandler.accept(executeSql(sql, new ArrayList<>()));
                 } catch (Exception e) {
-                    ExceptionUtils.logAndRethrow(e, "Failed to execute SQL statement in script: " + sql);
+                    LoggingUtils.logStructuredError("sql_script_execution", "execute_statement", FAILED,
+                            "Failed to execute SQL statement in script: " + sql, e);
+                    throw ExceptionUtils.wrap(e, "Failed to execute SQL statement in script: " + sql);
                 }
             }
         }
@@ -153,26 +153,23 @@ public class SqlExecutor {
 
             return SqlResult.ofResultSet(rows, meta);
         } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to handle SQL result set");
-            throw new IllegalStateException("Unreachable");
+            LoggingUtils.logStructuredError("sql_execution", "handle_result_set", FAILED,
+                    "Failed to handle SQL result set", e);
+            throw ExceptionUtils.wrap(e, "Failed to handle SQL result set");
         }
     }
 
     private SqlResult handleUpdateCount(int updateCount) {
-        try {
-            return SqlResult.ofUpdateCount(updateCount);
-        } catch (Exception e) {
-            ExceptionUtils.logAndRethrow(e, "Failed to handle SQL update count");
-            throw new IllegalStateException("Unreachable");
-        }
+        return SqlResult.ofUpdateCount(updateCount);
     }
 
     // Count the number of '?' placeholders in the SQL
     private int countPlaceholders(String sql) {
         int count = 0;
         for (int i = 0; i < sql.length(); i++) {
-            if (sql.charAt(i) == '?')
+            if (sql.charAt(i) == '?') {
                 count++;
+            }
         }
         return count;
     }
