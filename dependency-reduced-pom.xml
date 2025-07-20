@@ -160,8 +160,8 @@
       </build>
       <properties>
         <maven.compiler.release>21</maven.compiler.release>
-        <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
       </properties>
     </profile>
   </profiles>
@@ -225,17 +225,17 @@
     </dependencies>
   </dependencyManagement>
   <properties>
-    <shade.plugin.version>3.6.0</shade.plugin.version>
-    <oracle.jdbc.version>19.27.0.0</oracle.jdbc.version>
-    <jackson.version>2.15.3</jackson.version>
+    <assembly.plugin.version>3.7.1</assembly.plugin.version>
     <httpclient.version>4.5.14</httpclient.version>
-    <picocli.version>4.7.1</picocli.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <log4j2.version>2.25.0</log4j2.version>
-    <maven.compiler.source>8</maven.compiler.source>
+    <shade.plugin.version>3.6.0</shade.plugin.version>
+    <maven.compiler.target>8</maven.compiler.target>
     <h2.version>2.2.224</h2.version>
     <exec.plugin.version>3.5.1</exec.plugin.version>
-    <maven.compiler.target>8</maven.compiler.target>
-    <assembly.plugin.version>3.7.1</assembly.plugin.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <jackson.version>2.15.3</jackson.version>
+    <picocli.version>4.7.1</picocli.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <log4j2.version>2.25.0</log4j2.version>
+    <oracle.jdbc.version>19.27.0.0</oracle.jdbc.version>
   </properties>
 </project>

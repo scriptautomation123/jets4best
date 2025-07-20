@@ -111,7 +111,33 @@ case "$1" in
         echo "  demo <demo-name>     Run a named demo (vault-demo-urls, vault-demo-real, vault-demo-direct, cli-help, cli-print-config, cli-sample-connect)"
         ;;
     *)
-        # Default: run as CLI
-        exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" "$@"
+        # Check for required --vault-config parameter as first argument
+        if [ "$1" != "--vault-config" ]; then
+            echo "❌ Error: --vault-config parameter is required as first argument"
+            echo "Usage: $0 --vault-config /path/to/vault.yaml [exec-proc|exec-sql|exec-vault] [args...]"
+            echo "Example: $0 --vault-config ./vaults.yaml -d ECICMD03_svc01 -u MAV_T2T_APP"
+            exit 1
+        fi
+
+        VAULT_CONFIG="$2"
+        if [ ! -f "$VAULT_CONFIG" ]; then
+            echo "❌ Error: Vault config file not found: $VAULT_CONFIG"
+            exit 1
+        fi
+
+        # Add vault config to Java options
+        JAVA_OPTS="$JAVA_OPTS -Dvault.config=$VAULT_CONFIG"
+
+        # Remove --vault-config and path from arguments
+        shift 2
+
+        # Default: run as CLI with exec-proc if no subcommand specified
+        if [[ "$1" =~ ^(exec-proc|exec-sql|exec-vault)$ ]]; then
+            # User explicitly specified a subcommand
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" "$@"
+        else
+            # No subcommand specified, default to exec-proc
+            exec "$JAVA_CMD" $JAVA_OPTS -jar "$JAR_FILE" exec-proc "$@"
+        fi
         ;;
 esac 

@@ -63,5 +63,41 @@ if exist "%BUNDLE_DIR%\log4j2.xml" (
     set "JAVA_OPTS=%JAVA_OPTS% -Dlog4j.configurationFile=%BUNDLE_DIR%\log4j2.xml"
 )
 
-"%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_FILE%" %*
+REM Check for required --vault-config parameter
+set "VAULT_CONFIG="
+
+REM Check if first argument is --vault-config
+if "%1"=="--vault-config" (
+    set "VAULT_CONFIG=%2"
+    shift
+    shift
+) else (
+    echo ❌ Error: --vault-config parameter is required as first argument
+    echo Usage: %0 --vault-config /path/to/vault.yaml [exec-proc^|exec-sql^|exec-vault] [args...]
+    echo Example: %0 --vault-config ./vaults.yaml -d ECICMD03_svc01 -u MAV_T2T_APP
+    exit /b 1
+)
+
+REM Validate vault config file
+if not exist "%VAULT_CONFIG%" (
+    echo ❌ Error: Vault config file not found: %VAULT_CONFIG%
+    exit /b 1
+)
+
+REM Add vault config to Java options
+set "JAVA_OPTS=%JAVA_OPTS% -Dvault.config=%VAULT_CONFIG%"
+set "FIRST_ARG=%1"
+if "%FIRST_ARG%"=="exec-proc" (
+    REM User explicitly specified exec-proc
+    "%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_FILE%" %*
+) else if "%FIRST_ARG%"=="exec-sql" (
+    REM User explicitly specified exec-sql
+    "%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_FILE%" %*
+) else if "%FIRST_ARG%"=="exec-vault" (
+    REM User explicitly specified exec-vault
+    "%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_FILE%" %*
+) else (
+    REM No subcommand specified, default to exec-proc
+    "%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_FILE%" exec-proc %*
+)
 endlocal 

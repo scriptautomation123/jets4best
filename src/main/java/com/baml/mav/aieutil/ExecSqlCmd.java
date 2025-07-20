@@ -41,7 +41,9 @@ public class ExecSqlCmd extends BaseDatabaseCliCommand {
     }
 
     private static SqlExecutionService createService() {
-        return new SqlExecutionService(new PasswordResolver(new ExecSqlCmd()::promptForPassword));
+        return new SqlExecutionService(new PasswordResolver(() -> {
+            return new String(System.console().readPassword("Enter password: "));
+        }));
     }
 
     @Override
