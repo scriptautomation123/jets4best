@@ -1,5 +1,6 @@
 package com.baml.mav.aieutil;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
@@ -121,14 +122,21 @@ public class ExecProcCmd implements Callable<Integer> {
     private String resolvePassword() {
         if (hasDirectVaultParams()) {
             logger.info("Using direct vault parameters");
-            VaultClient client = new VaultClient();
-            return client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user);
+            try (VaultClient client = new VaultClient()) {
+                return client.fetchOraclePassword(vaultUrl, roleId, secretId, database, ait, user);
+            } catch (IOException e) {
+                logger.error("Failed to close VaultClient", e);
+                return null;
+            }
         }
 
-        VaultClient client = new VaultClient();
-        String password = client.fetchOraclePassword(user, database);
-        if (password != null && !password.trim().isEmpty()) {
-            return password;
+        try (VaultClient client = new VaultClient()) {
+            String password = client.fetchOraclePassword(user, database);
+            if (password != null && !password.trim().isEmpty()) {
+                return password;
+            }
+        } catch (IOException e) {
+            logger.error("Failed to close VaultClient", e);
         }
 
         spec.commandLine().getOut().println("[INFO] No vault config found for user: " + user);

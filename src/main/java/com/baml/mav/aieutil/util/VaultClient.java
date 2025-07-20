@@ -6,39 +6,49 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.Logger;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public final class VaultClient {
+public final class VaultClient implements AutoCloseable {
     private static final String CLIENT_TOKEN_PATH = "/auth/client_token";
     private static final String PASSWORD_PATH = "/data/password";
     private static final String VAULT_ERRORS_KEY = "errors";
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final HttpClient client;
+    private final CloseableHttpClient client;
     private final Logger logger = LoggingUtils.getLogger(VaultClient.class);
     private static final Logger staticLogger = LoggingUtils.getLogger(VaultClient.class);
 
     public VaultClient() {
+        // Configure connection pooling
+        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+        connectionManager.setMaxTotal(20);
+        connectionManager.setDefaultMaxPerRoute(10);
+
         // Configure timeouts for fast failure
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(2000) // 5 seconds connection timeout
-                .setSocketTimeout(2000) // 5 seconds socket timeout
-                .setConnectionRequestTimeout(2000) // 5 seconds connection request timeout
+                .setConnectTimeout(2000)
+                .setSocketTimeout(2000)
+                .setConnectionRequestTimeout(2000)
                 .build();
 
-        this.client = HttpClients.custom().setDefaultRequestConfig(requestConfig).build();
-        logger.debug("VaultClient initialized with 5s timeouts");
+        this.client = HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(requestConfig)
+                .build();
+
+        logger.debug("VaultClient initialized with connection pooling and 2s timeouts");
     }
 
     private String buildVaultBaseUrl(String baseUrl) {
@@ -195,18 +205,19 @@ public final class VaultClient {
             request.addHeader(header.getKey(), header.getValue());
         }
 
-        HttpResponse response = client.execute(request);
-        int statusCode = response.getStatusLine().getStatusCode();
+        try (CloseableHttpResponse response = client.execute(request)) {
+            int statusCode = response.getStatusLine().getStatusCode();
 
-        if (statusCode >= 400) {
-            String responseBody = EntityUtils.toString(response.getEntity());
-            String detailedError = parseVaultError(responseBody, statusCode);
-            staticLogger.error("Vault HTTP GET failed: {} - {}", statusCode, detailedError);
-            throw new ExceptionUtils.ConfigurationException(
-                    "Vault HTTP GET failed: " + statusCode + " - " + detailedError);
+            if (statusCode >= 400) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                String detailedError = parseVaultError(responseBody, statusCode);
+                staticLogger.error("Vault HTTP GET failed: {} - {}", statusCode, detailedError);
+                throw new ExceptionUtils.ConfigurationException(
+                        "Vault HTTP GET failed: " + statusCode + " - " + detailedError);
+            }
+
+            return EntityUtils.toString(response.getEntity());
         }
-
-        return EntityUtils.toString(response.getEntity());
     }
 
     private String parseVaultError(String responseBody, int statusCode) {
@@ -238,8 +249,7 @@ public final class VaultClient {
         }
     }
 
-    private String httpPost(String url, String body, Map<String, String> headers)
-            throws IOException {
+    private String httpPost(String url, String body, Map<String, String> headers) throws IOException {
         HttpPost request = new HttpPost(url);
 
         // Add headers
@@ -250,18 +260,19 @@ public final class VaultClient {
         // Set request body
         request.setEntity(new StringEntity(body, "UTF-8"));
 
-        HttpResponse response = client.execute(request);
-        int statusCode = response.getStatusLine().getStatusCode();
+        try (CloseableHttpResponse response = client.execute(request)) {
+            int statusCode = response.getStatusLine().getStatusCode();
 
-        if (statusCode >= 400) {
-            String responseBody = EntityUtils.toString(response.getEntity());
-            String detailedError = parseVaultError(responseBody, statusCode);
-            staticLogger.error("Vault HTTP POST failed: {} - {}", statusCode, detailedError);
-            throw new ExceptionUtils.ConfigurationException(
-                    "Vault HTTP POST failed: " + statusCode + " - " + detailedError);
+            if (statusCode >= 400) {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                String detailedError = parseVaultError(responseBody, statusCode);
+                staticLogger.error("Vault HTTP POST failed: {} - {}", statusCode, detailedError);
+                throw new ExceptionUtils.ConfigurationException(
+                        "Vault HTTP POST failed: " + statusCode + " - " + detailedError);
+            }
+
+            return EntityUtils.toString(response.getEntity());
         }
-
-        return EntityUtils.toString(response.getEntity());
     }
 
     private String parsePasswordFromResponse(String secretResponseBody) {
@@ -294,4 +305,11 @@ public final class VaultClient {
         }
     }
 
+    @Override
+    public void close() throws IOException {
+        if (client != null) {
+            logger.debug("Closing VaultClient HTTP client");
+            client.close();
+        }
+    }
 }
