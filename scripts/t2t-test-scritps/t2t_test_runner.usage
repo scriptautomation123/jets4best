@@ -1,0 +1,340 @@
+# 🧪 Test Command List for t2t_test_runner.sh
+
+## 📋 Prerequisites Setup
+
+First, set up the required environment variables:
+
+```bash
+# Required environment variables (set these before testing)
+export VAULT_CONFIG_PATH="/path/to/your/vaults.yaml"
+export VAULT_SECRET_ID="your-secret-id"
+export VAULT_URL="your-vault-url"
+export VAULT_ROLE_ID="your-role-id"
+export VAULT_AIT="your-ait"
+export DB_NAME="your-database-name"
+export DB_USER="your-database-user"
+export JAVA_8_HOME="/path/to/java8"
+export JAVA_21_HOME="/path/to/java21"
+export MAVEN_HOME="/path/to/maven"
+export EFS_INIT_FUNCTIONS="/path/to/init.functions"
+export EFS_INIT_ENVIRON="/path/to/init.environ"
+```
+
+## 🔧 1. Environment Setup Functions
+
+### Test `setup_environment()`:
+```bash
+./t2t_test_runner.sh --setup-only
+```
+
+### Test `set_java_version()` with Java 8:
+```bash
+JAVA_VERSION=8 ./t2t_test_runner.sh --setup-only
+```
+
+### Test `set_java_version()` with Java 21:
+```bash
+JAVA_VERSION=21 ./t2t_test_runner.sh --setup-only
+```
+
+## 🔍 2. Validation Functions
+
+### Test `validate_branch_name()` (valid):
+```bash
+# This will pass validation
+./t2t_test_runner.sh --build "feature/valid-branch-name"
+```
+
+### Test `validate_branch_name()` (invalid):
+```bash
+# This will fail validation
+./t2t_test_runner.sh --build "invalid@branch#name"
+```
+
+### Test `validate_java_version()` (valid):
+```bash
+JAVA_VERSION=8 ./t2t_test_runner.sh --build "main"
+```
+
+### Test `validate_java_version()` (invalid):
+```bash
+JAVA_VERSION=17 ./t2t_test_runner.sh --build "main"
+```
+
+## 🌿 3. Git Functions
+
+### Test `clone_branch()`:
+```bash
+./t2t_test_runner.sh --build "main"
+```
+
+### Test `clone_branch()` with non-existent branch:
+```bash
+./t2t_test_runner.sh --build "non-existent-branch"
+```
+
+## 🏗️ 4. Maven Functions
+
+### Test `maven_clean()`:
+```bash
+# Add this to the script temporarily for testing
+echo "Testing maven_clean..."
+maven_clean
+```
+
+### Test `maven_clean_package()`:
+```bash
+# This is called by build_and_prepare
+./t2t_test_runner.sh --build "main"
+```
+
+### Test `maven_clean_install()`:
+```bash
+# Add this to the script temporarily for testing
+echo "Testing maven_clean_install..."
+maven_clean_install
+```
+
+### Test `maven_assembly()`:
+```bash
+# Add this to the script temporarily for testing
+echo "Testing maven_assembly..."
+maven_assembly
+```
+
+## 📦 5. Distribution Functions
+
+### Test `extract_distribution()`:
+```bash
+# This is called by build_and_prepare
+./t2t_test_runner.sh --build "main"
+```
+
+### Test `extract_distribution()` with missing zip:
+```bash
+# Remove target/*-bundle.zip first
+rm -f target/*-bundle.zip
+./t2t_test_runner.sh --build "main"
+```
+
+## 🔄 6. Build Functions
+
+### Test `build_and_prepare()`:
+```bash
+./t2t_test_runner.sh --build "main"
+```
+
+### Test `build_and_prepare()` with Java 8:
+```bash
+JAVA_VERSION=8 ./t2t_test_runner.sh --build "main"
+```
+
+### Test `build_and_prepare()` with Java 21:
+```bash
+JAVA_VERSION=21 ./t2t_test_runner.sh --build "main"
+```
+
+## 🧹 7. Cleanup Functions
+
+### Test `cleanup_distribution()`:
+```bash
+# First create a test distribution
+./t2t_test_runner.sh --build "main"
+# Then clean it up (replace with actual directory name)
+./t2t_test_runner.sh --cleanup "distribution.20241201_120000"
+```
+
+### Test `cleanup_branch()`:
+```bash
+# First create a test branch
+./t2t_test_runner.sh --build "main"
+# Then clean it up (replace with actual branch name)
+./t2t_test_runner.sh --cleanup "distribution.20241201_120000" "main.20241201_120000"
+```
+
+### Test `cleanup_all()`:
+```bash
+# Clean up both distribution and branch
+./t2t_test_runner.sh --cleanup "distribution.20241201_120000" "main.20241201_120000"
+```
+
+## 🧪 8. Test Functions
+
+### Test `test_temp_table_creation_vault_id()`:
+```bash
+./t2t_test_runner.sh --test temp_table
+```
+
+### Test `test_enable_constraints_vault_id()`:
+```bash
+./t2t_test_runner.sh --test enable_constraints
+```
+
+### Test `test_partition_swap_vault_id()`:
+```bash
+./t2t_test_runner.sh --test partition_swap
+```
+
+### Test `test_temp_table_creation_full_vault()`:
+```bash
+# This is called by main()
+./t2t_test_runner.sh
+```
+
+### Test `test_enable_constraints_full_vault()`:
+```bash
+# This is called by main()
+./t2t_test_runner.sh
+```
+
+## 🚀 9. Full Workflow Functions
+
+### Test `run_tests_with_build()`:
+```bash
+./t2t_test_runner.sh --full-test "main"
+```
+
+### Test `run_tests_with_build()` with Java 8:
+```bash
+JAVA_VERSION=8 ./t2t_test_runner.sh --full-test "main"
+```
+
+## 📊 10. Main Function
+
+### Test `main()` (all tests):
+```bash
+./t2t_test_runner.sh
+```
+
+## 🔧 11. Utility Functions
+
+### Test `log()` function:
+```bash
+# All other commands use this, but you can test specific levels
+./t2t_test_runner.sh --help  # Shows INFO level
+./t2t_test_runner.sh --test nonexistent  # Shows ERROR level
+```
+
+### Test `error_exit()`:
+```bash
+./t2t_test_runner.sh --test nonexistent
+```
+
+### Test `check_command()`:
+```bash
+# Temporarily rename a required command
+mv $(which java) $(which java).bak
+./t2t_test_runner.sh --setup-only
+mv $(which java).bak $(which java)
+```
+
+### Test `check_file()`:
+```bash
+# Remove required file
+mv run.sh run.sh.bak
+./t2t_test_runner.sh --test temp_table
+mv run.sh.bak run.sh
+```
+
+### Test `check_directory()`:
+```bash
+# Remove required directory
+mv logs logs.bak
+./t2t_test_runner.sh --test temp_table
+mv logs.bak logs
+```
+
+## 🎯 12. Error Handling Tests
+
+### Test timeout handling:
+```bash
+# Set a very short timeout
+TEST_TIMEOUT_SECONDS=1 ./t2t_test_runner.sh --test temp_table
+```
+
+### Test invalid arguments:
+```bash
+./t2t_test_runner.sh --invalid-option
+./t2t_test_runner.sh --build
+./t2t_test_runner.sh --test
+```
+
+## 📝 13. Configuration Tests
+
+### Test with missing environment variables:
+```bash
+# Unset required variables
+unset VAULT_SECRET_ID
+./t2t_test_runner.sh --help
+```
+
+### Test with custom timeout:
+```bash
+TEST_TIMEOUT_SECONDS=600 ./t2t_test_runner.sh --test temp_table
+```
+
+## 🔍 14. Debugging Commands
+
+### Test with debug logging:
+```bash
+# Add debug output to see what's happening
+bash -x ./t2t_test_runner.sh --setup-only
+```
+
+### Test specific function in isolation:
+```bash
+# Source the script and test functions directly
+source ./t2t_test_runner.sh
+validate_branch_name "test-branch"
+validate_java_version "21"
+```
+
+## 📋 15. Quick Test Checklist
+
+```bash
+# 1. Basic setup
+./t2t_test_runner.sh --help
+
+# 2. Environment setup
+./t2t_test_runner.sh --setup-only
+
+# 3. Validation
+JAVA_VERSION=8 ./t2t_test_runner.sh --build "main"
+
+# 4. Build process
+./t2t_test_runner.sh --build "main"
+
+# 5. Individual test
+./t2t_test_runner.sh --test temp_table
+
+# 6. Full workflow
+./t2t_test_runner.sh --full-test "main"
+
+# 7. Cleanup
+./t2t_test_runner.sh --cleanup "distribution.20241201_120000" "main.20241201_120000"
+
+# 8. Complete test suite
+./t2t_test_runner.sh
+```
+
+## ⚠️ Important Notes
+
+1. **Environment Variables**: Make sure all required environment variables are set before testing
+2. **Git Repository**: Ensure you're in a valid git repository for branch operations
+3. **Maven Project**: Ensure you have a valid Maven project with proper `pom.xml`
+4. **Dependencies**: Ensure all required tools (java, mvn, git, unzip) are available
+5. **Permissions**: Ensure the script has execute permissions (`chmod +x t2t_test_runner.sh`)
+
+## 🎯 Recommended Testing Order
+
+1. Start with `--help` to verify script loads
+2. Test `--setup-only` to verify environment setup
+3. Test validation functions with `--build`
+4. Test individual Maven functions (if needed)
+5. Test full build workflow
+6. Test individual test functions
+7. Test full test suite
+8. Test cleanup functions
+9. Test error conditions
+
+This comprehensive test suite will help you verify that each function works correctly in isolation and as part of the larger workflow.

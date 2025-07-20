@@ -1,0 +1,13 @@
+# Required environment variables (set these before testing)
+export VAULT_CONFIG_PATH="/path/to/your/vaults.yaml"
+export VAULT_SECRET_ID="your-secret-id"
+export VAULT_URL="your-vault-url"
+export VAULT_ROLE_ID="your-role-id"
+export VAULT_AIT="71296"
+export DB_NAME="ECICMD03_SVC01"
+export DB_USER="MAV_T2T_APP"
+export JAVA_8_HOME="/path/to/java8"
+export JAVA_21_HOME="/path/to/java21"
+export MAVEN_HOME="/path/to/maven"
+export EFS_INIT_FUNCTIONS="/path/to/init.functions"
+export EFS_INIT_ENVIRON="/path/to/init.environ"
