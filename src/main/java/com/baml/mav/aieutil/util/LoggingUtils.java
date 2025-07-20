@@ -227,7 +227,7 @@ public final class LoggingUtils {
       final Throwable throwable) {
     final Logger logger = getLogger(LoggingUtils.class);
     logger.error(
-        "event={} operation={} errorType={} message={}", event, operation, errorType, message, throwable);
+        "event={} operation={} errorType={} message={} exception={}", event, operation, errorType, message, throwable);
   }
 
   /**
