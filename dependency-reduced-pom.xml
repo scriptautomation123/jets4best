@@ -73,7 +73,7 @@
               </filters>
               <transformers>
                 <transformer>
-                  <mainClass>com.baml.mav.aieutil.ExecProcedureCmd</mainClass>
+                  <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
                 </transformer>
                 <transformer />
               </transformers>
@@ -160,8 +160,8 @@
       </build>
       <properties>
         <maven.compiler.release>21</maven.compiler.release>
-        <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
       </properties>
     </profile>
   </profiles>
@@ -188,6 +188,11 @@
         <version>${jackson.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.oracle.database.jdbc</groupId>
         <artifactId>ojdbc10</artifactId>
         <version>${oracle.jdbc.version}</version>
@@ -208,6 +213,11 @@
         <version>${httpclient.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>4.4.16</version>
+      </dependency>
+      <dependency>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
         <version>2.18.0</version>
@@ -215,17 +225,17 @@
     </dependencies>
   </dependencyManagement>
   <properties>
-    <assembly.plugin.version>3.7.1</assembly.plugin.version>
-    <httpclient.version>4.5.14</httpclient.version>
     <shade.plugin.version>3.6.0</shade.plugin.version>
-    <maven.compiler.target>8</maven.compiler.target>
+    <oracle.jdbc.version>19.27.0.0</oracle.jdbc.version>
+    <jackson.version>2.15.3</jackson.version>
+    <httpclient.version>4.5.14</httpclient.version>
+    <picocli.version>4.7.1</picocli.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <log4j2.version>2.25.0</log4j2.version>
+    <maven.compiler.source>8</maven.compiler.source>
     <h2.version>2.2.224</h2.version>
     <exec.plugin.version>3.5.1</exec.plugin.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jackson.version>2.15.3</jackson.version>
-    <picocli.version>4.7.1</picocli.version>
-    <maven.compiler.source>8</maven.compiler.source>
-    <log4j2.version>2.25.0</log4j2.version>
-    <oracle.jdbc.version>19.27.0.0</oracle.jdbc.version>
+    <maven.compiler.target>8</maven.compiler.target>
+    <assembly.plugin.version>3.7.1</assembly.plugin.version>
   </properties>
 </project>

@@ -89,7 +89,7 @@ endif
 
 if (type == "oracle" && host == null?) then (yes)
   :OracleLdap.buildUrl();
-  note right: Build Oracle LDAP URL for production database
+note right: Build Oracle LDAP URL for production database
   :Load LDAP config from application.yaml;
   :Build URL: jdbc:oracle:thin@ldap://oid1puser.bankofamerica...);
 else (no)
@@ -103,27 +103,27 @@ endif
 :ProcedureExecutionService.executeWithConnection(request, conn);
 :DatabaseService.executeProcedure(conn, procedure, input, output);
 :ProcedureExecutor.executeProcedureWithStrings(\nconn, procFullName, inputParams, outputParams);
-
+  
 |#Pink|Database Operations|
-:Parse procedure name and parameters;
+  :Parse procedure name and parameters;
 :parseStringInputParams(inputParams);
 :parseStringOutputParams(outputParams);
 :buildCallString(procFullName, inputs.size(), outputs.size());
-:Create CallableStatement;
+  :Create CallableStatement;
 :Set input parameters (setParameter);
 :Register output parameters (registerOutParameter);
 :Execute stored procedure (call.execute());
 :Extract output parameters (call.getObject());
-:Return result Map<String, Object>;
-
+  :Return result Map<String, Object>;
+  
 |#LightBlue|Result Processing|
 :ExecutionResult.success(result);
 :result.formatOutput(System.out);
 
-if (Single result?) then (yes)
-  :Print single value to console;
-else (no)
-  :Print key-value pairs to console;
+  if (Single result?) then (yes)
+    :Print single value to console;
+  else (no)
+    :Print key-value pairs to console;
 endif
 
 :Return success code 0;

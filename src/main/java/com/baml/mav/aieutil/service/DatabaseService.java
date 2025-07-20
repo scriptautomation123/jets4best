@@ -1,70 +1,128 @@
 package com.baml.mav.aieutil.service;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
 
-import com.baml.mav.aieutil.database.ConnectionStringGenerator;
+import com.baml.mav.aieutil.auth.PasswordResolver;
 import com.baml.mav.aieutil.database.ProcedureExecutor;
 import com.baml.mav.aieutil.util.LoggingUtils;
 
-public class DatabaseService {
-    private static final ProcedureExecutor procedureExecutor = new ProcedureExecutor();
+/**
+ * Database service implementation for executing stored procedures.
+ * Extends AbstractDatabaseExecutionService to provide procedure-specific
+ * execution logic.
+ */
+public class DatabaseService extends AbstractDatabaseExecutionService {
 
-    private DatabaseService() {
-        // Utility class - prevent instantiation
+  /** Static procedure executor instance for database operations */
+  private static final ProcedureExecutor PROCEDURE_EXECUTOR = new ProcedureExecutor();
+
+  /**
+   * Constructs a new DatabaseService with password resolver.
+   * 
+   * @param passwordResolver resolver for database passwords
+   */
+  public DatabaseService(final PasswordResolver passwordResolver) {
+    super(passwordResolver);
+  }
+
+  @Override
+  protected ExecutionResult executeWithConnection(final DatabaseRequest request, final Connection conn)
+      throws SQLException {
+    if (request instanceof ProcedureRequest) {
+      final ProcedureRequest procedureRequest = (ProcedureRequest) request;
+      return executeProcedure(procedureRequest, conn);
+    } else {
+      LoggingUtils.logStructuredError(
+          "database_execution",
+          "execute",
+          "UNSUPPORTED_REQUEST_TYPE",
+          "Unsupported request type: " + request.getClass().getName(),
+          null);
+      throw new IllegalArgumentException(
+          "Unsupported request type: " + request.getClass().getName());
+    }
+  }
+
+  /**
+   * Executes a stored procedure with the given request and connection.
+   * 
+   * @param request procedure request containing execution parameters
+   * @param conn    database connection
+   * @return execution result
+   * @throws SQLException if execution fails
+   */
+  private ExecutionResult executeProcedure(final ProcedureRequest request, final Connection conn)
+      throws SQLException {
+    final Map<String, Object> result = executeProcedureInternal(
+        conn, request.getProcedure(), request.getInput(), request.getOutput());
+
+    return ExecutionResult.success(result);
+  }
+
+  /**
+   * Internal method to execute a stored procedure with validation.
+   * 
+   * @param conn      database connection
+   * @param procedure procedure name to execute
+   * @param input     input parameters string
+   * @param output    output parameters string
+   * @return execution result map
+   * @throws SQLException if execution fails
+   */
+  private Map<String, Object> executeProcedureInternal(
+      final Connection conn, final String procedure, final String input, final String output) throws SQLException {
+
+    final Map<String, Object> validationResult = validateProcedureParameters(conn, procedure);
+    if (!validationResult.isEmpty()) {
+      return validationResult;
     }
 
-    public static Connection createConnection(String type, String database, String user, String password)
-            throws SQLException {
-        // Validate inputs
-        if (type == null || type.trim().isEmpty()) {
-            throw new IllegalArgumentException("Database type cannot be null or empty");
-        }
-        if (database == null || database.trim().isEmpty()) {
-            throw new IllegalArgumentException("Database name cannot be null or empty");
-        }
-        if (user == null || user.trim().isEmpty()) {
-            throw new IllegalArgumentException("Database user cannot be null or empty");
-        }
-        if (password == null) {
-            throw new IllegalArgumentException("Database password cannot be null");
-        }
+    LoggingUtils.logProcedureExecution(procedure, input, output);
 
-        // If host is null, it gets the LDAP connection string
-        String connectionUrl = ConnectionStringGenerator.createConnectionString(type, database, user, password, null)
-                .getUrl();
+    final Map<String, Object> result = PROCEDURE_EXECUTOR.executeProcedureWithStrings(conn, procedure, input, output);
 
-        LoggingUtils.logDatabaseConnection(type, database, user);
+    LoggingUtils.logProcedureExecutionSuccess(procedure);
+    return result;
+  }
 
-        try {
-            Connection conn = DriverManager.getConnection(connectionUrl, user, password);
-            LoggingUtils.logStructuredError("database_connection", "create", "SUCCESS",
-                    "Successfully connected to database", null);
-            return conn;
-        } catch (SQLException e) {
-            LoggingUtils.logStructuredError("database_connection", "create", "FAILED",
-                    "Failed to connect to database: " + e.getMessage(), e);
-            throw e;
-        }
+  /**
+   * Validates procedure execution parameters.
+   * 
+   * @param conn      database connection to validate
+   * @param procedure procedure name to validate
+   * @return error result map if validation fails, null if validation passes
+   */
+  private Map<String, Object> validateProcedureParameters(final Connection conn, final String procedure) {
+    if (conn == null) {
+      LoggingUtils.logStructuredError(
+          "procedure_execution",
+          "validation",
+          "FAILED",
+          "Database connection cannot be null",
+          null);
+      return java.util.Collections.singletonMap("error", "Database connection cannot be null");
     }
-
-    public static Map<String, Object> executeProcedure(Connection conn, String procedure, String input, String output)
-            throws SQLException {
-        // Validate inputs
-        if (conn == null) {
-            throw new IllegalArgumentException("Database connection cannot be null");
-        }
-        if (procedure == null || procedure.trim().isEmpty()) {
-            throw new IllegalArgumentException("Procedure name cannot be null or empty");
-        }
-
-        LoggingUtils.logProcedureExecution(procedure, input, output);
-
-        Map<String, Object> result = procedureExecutor.executeProcedureWithStrings(conn, procedure, input, output);
-
-        LoggingUtils.logProcedureExecutionSuccess(procedure);
-        return result;
+    if (isNullOrBlank(procedure)) {
+      LoggingUtils.logStructuredError(
+          "procedure_execution",
+          "validation",
+          "FAILED",
+          "Procedure name cannot be null or empty",
+          null);
+      return java.util.Collections.singletonMap("error", "Procedure name cannot be null or empty");
     }
+    return java.util.Collections.emptyMap();
+  }
+
+  /**
+   * Checks if a string is null or contains only whitespace.
+   * 
+   * @param value string to check
+   * @return true if null or blank
+   */
+  private static boolean isNullOrBlank(final String value) {
+    return value == null || value.trim().isEmpty();
+  }
 }

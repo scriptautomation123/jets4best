@@ -9,86 +9,149 @@ import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.LoggingUtils;
 import com.baml.mav.aieutil.util.VaultClient;
 
+/**
+ * Resolves database passwords using multiple strategies: direct vault
+ * parameters,
+ * vault lookup, or console prompting. Provides a unified interface for password
+ * resolution across different authentication methods.
+ */
 public class PasswordResolver {
-    private static final String DIRECT_VAULT = "direct_vault";
-    private static final String PASSWORD_RESOLUTION = "password_resolution";
-    private static final String FAILED = "FAILED";
-    private final Supplier<String> passwordPrompter;
 
-    public PasswordResolver(Supplier<String> passwordPrompter) {
-        this.passwordPrompter = Objects.requireNonNull(passwordPrompter, "Password prompter cannot be null");
+  /** Context for direct vault parameter resolution */
+  private static final String DIRECT_VAULT = "direct_vault";
+
+  /** Context for password resolution operations */
+  private static final String PWD_RESOLUTION = "password_resolution";
+
+  /** Error status for failed operations */
+  private static final String FAILED = "FAILED";
+
+  /** Supplier for console password prompting */
+  private final Supplier<String> passwordPrompter;
+
+  /**
+   * Constructs a PasswordResolver with a password prompter function.
+   * 
+   * @param passwordPrompter function to prompt for password when other methods
+   *                         fail
+   */
+  public PasswordResolver(final Supplier<String> passwordPrompter) {
+    this.passwordPrompter = Objects.requireNonNull(passwordPrompter, "Password prompter cannot be null");
+  }
+
+  /**
+   * Resolves a password using the most appropriate method based on the request.
+   * Tries direct vault parameters first, then vault lookup, then console prompt.
+   * 
+   * @param request the password request containing user and database information
+   * @return Optional containing the resolved password, or empty if resolution
+   *         failed
+   * @throws RuntimeException if password resolution fails and cannot fall back to
+   *                          console prompt
+   */
+  public Optional<String> resolvePassword(final PasswordRequest request) {
+    Objects.requireNonNull(request, "PasswordRequest cannot be null");
+
+    try {
+      return attemptPasswordResolution(request);
+    } catch (Exception e) {
+      LoggingUtils.logStructuredError(
+          PWD_RESOLUTION,
+          "resolve",
+          FAILED,
+          "Failed to resolve password for user: " + request.getUser(),
+          e);
+      throw ExceptionUtils.wrap(e, "Failed to resolve password for user: " + request.getUser());
+    }
+  }
+
+  private Optional<String> attemptPasswordResolution(final PasswordRequest request) {
+    // Try direct vault parameters first
+    if (request.hasDirectVaultParams()) {
+      LoggingUtils.logPasswordResolution(request.getUser(), DIRECT_VAULT);
+      return resolveWithDirectVaultParams(request);
     }
 
-    public Optional<String> resolvePassword(PasswordRequest request) {
-        Objects.requireNonNull(request, "PasswordRequest cannot be null");
-
-        try {
-            // Direct vault parameters
-            if (request.hasDirectVaultParams()) {
-                LoggingUtils.logPasswordResolution(request.getUser(), DIRECT_VAULT);
-                return resolveWithDirectVaultParams(request);
-            }
-
-            // Vault lookup
-            Optional<String> vaultPassword = resolveWithVaultLookup(request);
-            if (vaultPassword.isPresent()) {
-                LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
-                return vaultPassword;
-            }
-
-            // Console prompt
-            LoggingUtils.logPasswordResolution(request.getUser(), DIRECT_VAULT);
-            return Optional.ofNullable(passwordPrompter.get());
-        } catch (Exception e) {
-            LoggingUtils.logStructuredError(PASSWORD_RESOLUTION, "resolve", FAILED,
-                    "Failed to resolve password for user: " + request.getUser(), e);
-            throw ExceptionUtils.wrap(e, "Failed to resolve password for user: " + request.getUser());
-        }
+    // Try vault lookup
+    final Optional<String> vaultPassword = resolveWithVaultLookup(request);
+    if (vaultPassword.isPresent()) {
+      LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
+      return vaultPassword;
     }
 
-    private Optional<String> resolveWithDirectVaultParams(PasswordRequest request) {
-        try (VaultClient client = new VaultClient()) {
-            String password = client.fetchOraclePassword(
-                    request.getVaultUrl(), request.getRoleId(), request.getSecretId(),
-                    request.getDatabase(), request.getAit(), request.getUser());
+    // Fall back to console prompt
+    LoggingUtils.logPasswordResolution(request.getUser(), DIRECT_VAULT);
+    return Optional.ofNullable(passwordPrompter.get());
+  }
 
-            Optional<String> result = Optional.ofNullable(password)
-                    .filter(pwd -> !pwd.trim().isEmpty());
+  private Optional<String> resolveWithDirectVaultParams(final PasswordRequest request) {
+    try (VaultClient client = new VaultClient()) {
+      final String password = fetchPasswordFromVault(client, request);
+      final Optional<String> result = validatePassword(password);
 
-            if (result.isPresent()) {
-                LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
-            } else {
-                LoggingUtils.logStructuredError(PASSWORD_RESOLUTION, DIRECT_VAULT, FAILED,
-                        "No password returned from direct vault parameters", null);
-            }
+      if (result.isPresent()) {
+        LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
+      } else {
+        LoggingUtils.logStructuredError(
+            PWD_RESOLUTION,
+            DIRECT_VAULT,
+            FAILED,
+            "No password returned from direct vault parameters",
+            null);
+      }
 
-            return result;
-        } catch (IOException e) {
-            LoggingUtils.logStructuredError(PASSWORD_RESOLUTION, DIRECT_VAULT, FAILED,
-                    "Failed to fetch password from vault with direct params for user: " + request.getUser(), e);
-            throw ExceptionUtils.wrap(e, "Failed to fetch password from vault");
-        }
+      return result;
+    } catch (IOException e) {
+      LoggingUtils.logStructuredError(
+          PWD_RESOLUTION,
+          DIRECT_VAULT,
+          FAILED,
+          "Failed to fetch password from vault with direct params for user: " + request.getUser(),
+          e);
+      throw ExceptionUtils.wrap(e, "Failed to fetch password from vault");
     }
+  }
 
-    private Optional<String> resolveWithVaultLookup(PasswordRequest request) {
-        try (VaultClient client = new VaultClient()) {
-            String password = client.fetchOraclePassword(request.getUser(), request.getDatabase());
-            Optional<String> result = Optional.ofNullable(password)
-                    .filter(pwd -> !pwd.trim().isEmpty());
+  private String fetchPasswordFromVault(final VaultClient client, final PasswordRequest request) {
+    return client.fetchOraclePassword(
+        request.getVaultUrl(),
+        request.getRoleId(),
+        request.getSecretId(),
+        request.getDatabase(),
+        request.getAit(),
+        request.getUser());
+  }
 
-            if (result.isPresent()) {
-                LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
-            } else {
-                LoggingUtils.logStructuredError(PASSWORD_RESOLUTION, DIRECT_VAULT, "NO_CONFIG",
-                        "No vault config found for user: " + request.getUser(), null);
-            }
+  private Optional<String> resolveWithVaultLookup(final PasswordRequest request) {
+    try (VaultClient client = new VaultClient()) {
+      final String password = client.fetchOraclePassword(request.getUser(), request.getDatabase());
+      final Optional<String> result = validatePassword(password);
 
-            return result;
-        } catch (IOException e) {
-            LoggingUtils.logStructuredError(PASSWORD_RESOLUTION, DIRECT_VAULT, FAILED,
-                    "Failed to fetch password from vault lookup for user: " + request.getUser(), e);
-            // Don't throw here - fall back to console prompt
-            return Optional.empty();
-        }
+      if (result.isPresent()) {
+        LoggingUtils.logPasswordResolutionSuccess(request.getUser(), DIRECT_VAULT);
+      } else {
+        LoggingUtils.logStructuredError(
+            PWD_RESOLUTION,
+            DIRECT_VAULT,
+            "NO_CONFIG",
+            "No vault config found for user: " + request.getUser(),
+            null);
+      }
+
+      return result;
+    } catch (IOException e) {
+      LoggingUtils.logStructuredError(
+          PWD_RESOLUTION,
+          DIRECT_VAULT,
+          FAILED,
+          "Failed to fetch password from vault lookup for user: " + request.getUser(),
+          e);
+      // Don't throw here - fall back to console prompt
+      return Optional.empty();
     }
+  }
+
+  private static Optional<String> validatePassword(final String password) {
+    return Optional.ofNullable(password).filter(pwd -> !pwd.trim().isEmpty());
+  }
 }
