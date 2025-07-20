@@ -13,7 +13,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <log4j2.version>2.25.0</log4j2.version>
         <jackson.version>2.15.3</jackson.version>
-        <oracle.jdbc.version>19.27.0.0</oracle.jdbc.version>
+        <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
         <h2.version>2.2.224</h2.version>
         <shade.plugin.version>3.6.0</shade.plugin.version>
         <exec.plugin.version>3.5.1</exec.plugin.version>
@@ -55,7 +55,7 @@
             <!-- Oracle JDBC -->
             <dependency>
                 <groupId>com.oracle.database.jdbc</groupId>
-                <artifactId>ojdbc10</artifactId>
+                <artifactId>ojdbc8</artifactId>
                 <version>${oracle.jdbc.version}</version>
             </dependency>
             <!-- H2 Database -->
@@ -122,6 +122,10 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpcore</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.database.jdbc</groupId>
+            <artifactId>ojdbc8</artifactId>
         </dependency>
     </dependencies>
     <!-- Centralized plugin versions -->

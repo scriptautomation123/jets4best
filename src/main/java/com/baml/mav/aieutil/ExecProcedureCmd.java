@@ -40,9 +40,8 @@ public class ExecProcedureCmd extends BaseDatabaseCliCommand {
   }
 
   private static DatabaseService createService() {
-    return new DatabaseService(new PasswordResolver(() -> {
-      return new String(System.console().readPassword("Enter password: "));
-    }));
+    return new DatabaseService(
+        new PasswordResolver(() -> new String(System.console().readPassword("Enter password: "))));
   }
 
   @Override
