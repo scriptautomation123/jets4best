@@ -1,0 +1,14 @@
+databases:
+  h2:
+    connection-string:
+      jdbc-thin:
+        template: "jdbc:h2:mem:%s"
+  oracle:
+    connection-string:
+      jdbc-thin:
+        template: "jdbc:oracle:thin:@%s:%d/%s"
+        port: 1521
+      ldap:
+        port: 389
+        context: "cn=OracleContext,dc=example,dc=com"
+        servers: "ldap.example.com" 

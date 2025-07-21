@@ -30,6 +30,15 @@ public class DatabaseService extends AbstractDatabaseExecutionService {
   @Override
   protected ExecutionResult executeWithConnection(final DatabaseRequest request, final Connection conn)
       throws SQLException {
+    if (conn == null) {
+      LoggingUtils.logStructuredError(
+          "procedure_execution",
+          "validation",
+          "FAILED",
+          "Database connection cannot be null",
+          null);
+      return ExecutionResult.failure(1, "Database connection cannot be null");
+    }
     if (request instanceof ProcedureRequest) {
       final ProcedureRequest procedureRequest = (ProcedureRequest) request;
       return executeProcedure(procedureRequest, conn);

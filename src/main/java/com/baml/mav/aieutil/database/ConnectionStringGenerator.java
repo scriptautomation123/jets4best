@@ -6,7 +6,18 @@ import com.baml.mav.aieutil.util.ExceptionUtils;
 import com.baml.mav.aieutil.util.YamlConfig;
 
 public class ConnectionStringGenerator {
-  private static final YamlConfig appConfig = new YamlConfig("application.yaml");
+  private static YamlConfig appConfig = null;
+
+  public static void setConfigPath(String path) {
+    appConfig = new YamlConfig(path);
+  }
+
+  private static YamlConfig getConfig() {
+    if (appConfig == null) {
+      appConfig = new YamlConfig("application.yaml");
+    }
+    return appConfig;
+  }
 
   public static class ConnInfo {
     private final String url;
@@ -45,7 +56,7 @@ public class ConnectionStringGenerator {
 
     @Override
     public String buildUrl() {
-      String template = appConfig.getRawValue("databases.h2.connection-string.jdbc-thin.template");
+      String template = getConfig().getRawValue("databases.h2.connection-string.jdbc-thin.template");
       return String.format(template, database);
     }
   }
@@ -59,7 +70,7 @@ public class ConnectionStringGenerator {
 
     @Override
     public String buildUrl() {
-      String template = appConfig.getRawValue("databases.h2.connection-string.jdbc-thin.template");
+      String template = getConfig().getRawValue("databases.h2.connection-string.jdbc-thin.template");
       return String.format(template, "mem:" + database);
     }
   }
@@ -76,11 +87,9 @@ public class ConnectionStringGenerator {
     @Override
     public String buildUrl() {
       try {
-        String template =
-            appConfig.getRawValue("databases.oracle.connection-string.jdbc-thin.template");
-        int port =
-            Integer.parseInt(
-                appConfig.getRawValue("databases.oracle.connection-string.jdbc-thin.port"));
+        String template = getConfig().getRawValue("databases.oracle.connection-string.jdbc-thin.template");
+        int port = Integer.parseInt(
+            getConfig().getRawValue("databases.oracle.connection-string.jdbc-thin.port"));
         return String.format(template, host, port, database);
       } catch (Exception e) {
         throw ExceptionUtils.wrap(
@@ -99,11 +108,9 @@ public class ConnectionStringGenerator {
     @Override
     public String buildUrl() {
       try {
-        int port =
-            Integer.parseInt(appConfig.getRawValue("databases.oracle.connection-string.ldap.port"));
-        String context = appConfig.getRawValue("databases.oracle.connection-string.ldap.context");
-        String[] servers =
-            appConfig.getRawValue("databases.oracle.connection-string.ldap.servers").split(",");
+        int port = Integer.parseInt(getConfig().getRawValue("databases.oracle.connection-string.ldap.port"));
+        String context = getConfig().getRawValue("databases.oracle.connection-string.ldap.context");
+        String[] servers = getConfig().getRawValue("databases.oracle.connection-string.ldap.servers").split(",");
 
         StringBuilder urlBuilder = new StringBuilder("jdbc:oracle:thin:@");
 
