@@ -1,68 +1,58 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # =============================================================================
-# T2T Process Automation Script
+# T2T Process Automation Script (Enhanced)
 #
-# Automates build and T2T (Temp Table, Constraints, Partition Swap) process for AIE Util.
-#
-# Features:
-#   - Interactive and non-interactive modes
-#   - Supports branch cloning, build, and T2T execution
-#   - Robust error handling and optional logging
-#   - Modular functions for each T2T step
-#
-# Requirements:
-#   - git, mvn, unzip, module (for JDK switching), run.sh, vaults.yaml
-#   - Environment must have access to required JDKs and Maven profiles
-#
-# Usage:
-#   ./t2t_process.sh [-i] [--build-and-t2t|--t2t-only] [--branch <branch_url>] \
-#       [--mode t2t_regular|t2t_full] [--jdk 8|21] [--proj_dir DIR] [--app APP] \
-#       [--insght_typ_code CODE] [--logging 1]
-#
-#   -i                Interactive mode (prompts for JDK, mode, insight type code)
-#   --build-and-t2t   Clone/build and run T2T (default)
-#   --t2t-only        Only run T2T (skip build)
-#   --branch URL      Clone branch and set as PROJ_DIR
-#   --mode            t2t_regular (default) or t2t_full (passes vault params)
-#   --jdk             8 (default) or 21
-#   --proj_dir DIR    Set project directory
-#   --app APP         Set app name (default: aieutil-1.0.0)
-#   --insght_typ_code Set insight type code (default: 136)
-#   --logging 1       Enable logging
-#
-# Example:
-#   ./t2t_process.sh --build-and-t2t --branch https://git.example.com/repo.git \
-#       --mode t2t_full --jdk 21 --insght_typ_code 136 --logging 1
+# Combines interactive/manual T2T process with robust validation, logging, and
+# error handling from t2t_test_runner.sh. Production-ready for both devs and CI.
 # =============================================================================
 
-# === Configurable Variables ===
-JDK="${JDK:-8}"                # 8 or 21
-PROJ_DIR="${PROJ_DIR:-/path/to/project}"
-APP="${APP:-aieutil-1.0.0}"
-INSGHT_TYP_CODE="${INSGHT_TYP_CODE:-136}"
-MODE="${MODE:-t2t_regular}"    # t2t_regular or t2t_full
-LOGGING="${LOGGING:-0}"
-INTERACTIVE=0
-BUILD_AND_T2T=1
-T2T_ONLY=0
-BRANCH_URL=""
+# Colors for console output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
-# Vault params for t2t_full
-VAULT_ID="19ed2836-4d51-5c2c-847e-cc157d656899"
-VAULT_URL="https://vault-lle.bankofamerica.com"
-ROLE_ID="ZSXG917"
-AIT="71296"
-
+# Enhanced logging
 log() {
-    if [[ "$LOGGING" == "1" ]]; then
-        echo "[LOG] $*"
-    fi
+    local level="$1"; shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    case "$level" in
+        INFO)    echo -e "${BLUE}[INFO]${NC} $message" ;;
+        SUCCESS) echo -e "${GREEN}[SUCCESS]${NC} $message" ;;
+        WARNING) echo -e "${YELLOW}[WARNING]${NC} $message" ;;
+        ERROR)   echo -e "${RED}[ERROR]${NC} $message" ;;
+        DEBUG)   echo -e "${PURPLE}[DEBUG]${NC} $message" ;;
+        *)       echo -e "[LOG] $message" ;;
+    esac
 }
 
 error_exit() {
-    echo "[ERROR] $*" >&2
+    log ERROR "$1"
     exit 1
+}
+
+# Utility checks
+check_command() { command -v "$1" &>/dev/null || error_exit "$1 is not installed or not in PATH"; }
+check_file()    { [[ -f "$1" ]] || error_exit "Required file not found: $1"; }
+check_directory() { [[ -d "$1" ]] || error_exit "Required directory not found: $1"; }
+
+# Validate required env vars (add more as needed)
+validate_env() {
+    local missing=0
+    for var in JDK PROJ_DIR APP INSGHT_TYP_CODE; do
+        if [[ -z "${!var:-}" ]]; then
+            log ERROR "Required env var missing: $var"
+            missing=1
+        fi
+    done
+    if (( missing )); then exit 1; fi
 }
 
 usage() {

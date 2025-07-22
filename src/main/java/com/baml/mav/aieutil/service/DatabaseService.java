@@ -17,6 +17,10 @@ public class DatabaseService extends AbstractDatabaseExecutionService {
 
   /** Static procedure executor instance for database operations */
   private static final ProcedureExecutor PROCEDURE_EXECUTOR = new ProcedureExecutor();
+  private static final String PROCEDURE_EXECUTION_EVENT = "procedure_execution";
+  private static final String VALIDATION_EVENT = "validation";
+  private static final String FAILED_STATUS = "FAILED";
+  private static final String ERR_DB_CONN_NULL = "Database connection cannot be null";
 
   /**
    * Constructs a new DatabaseService with password resolver.
@@ -32,12 +36,12 @@ public class DatabaseService extends AbstractDatabaseExecutionService {
       throws SQLException {
     if (conn == null) {
       LoggingUtils.logStructuredError(
-          "procedure_execution",
-          "validation",
-          "FAILED",
-          "Database connection cannot be null",
+          PROCEDURE_EXECUTION_EVENT,
+          VALIDATION_EVENT,
+          FAILED_STATUS,
+          ERR_DB_CONN_NULL,
           null);
-      return ExecutionResult.failure(1, "Database connection cannot be null");
+      return ExecutionResult.failure(1, ERR_DB_CONN_NULL);
     }
     if (request instanceof ProcedureRequest) {
       final ProcedureRequest procedureRequest = (ProcedureRequest) request;
@@ -106,18 +110,18 @@ public class DatabaseService extends AbstractDatabaseExecutionService {
   private Map<String, Object> validateProcedureParameters(final Connection conn, final String procedure) {
     if (conn == null) {
       LoggingUtils.logStructuredError(
-          "procedure_execution",
-          "validation",
-          "FAILED",
-          "Database connection cannot be null",
+          PROCEDURE_EXECUTION_EVENT,
+          VALIDATION_EVENT,
+          FAILED_STATUS,
+          ERR_DB_CONN_NULL,
           null);
-      return java.util.Collections.singletonMap("error", "Database connection cannot be null");
+      return java.util.Collections.singletonMap("error", ERR_DB_CONN_NULL);
     }
     if (isNullOrBlank(procedure)) {
       LoggingUtils.logStructuredError(
-          "procedure_execution",
-          "validation",
-          "FAILED",
+          PROCEDURE_EXECUTION_EVENT,
+          VALIDATION_EVENT,
+          FAILED_STATUS,
           "Procedure name cannot be null or empty",
           null);
       return java.util.Collections.singletonMap("error", "Procedure name cannot be null or empty");

@@ -54,3 +54,4 @@ engineering
 **/target/*
 .cursorignore
 docs/OutputFormatter.java
+todo
