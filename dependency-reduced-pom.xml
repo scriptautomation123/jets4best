@@ -35,25 +35,6 @@
     </pluginManagement>
     <plugins>
       <plugin>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>${maven.enforcer.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>enforce-maven</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <requireMavenVersion>
-                  <version>3.6.3</version>
-                </requireMavenVersion>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
           <source>${maven.compiler.source}</source>
@@ -61,13 +42,6 @@
           <compilerArgs>
             <arg>-proc:none</arg>
           </compilerArgs>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven.surefire.plugin.version}</version>
-        <configuration>
-          <useModulePath>false</useModulePath>
         </configuration>
       </plugin>
       <plugin>
@@ -159,8 +133,8 @@
       </build>
       <properties>
         <maven.compiler.release>21</maven.compiler.release>
-        <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
       </properties>
     </profile>
     <profile>
@@ -204,46 +178,6 @@
       </build>
     </profile>
   </profiles>
-  <dependencies>
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <version>2.1.214</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <version>5.13.4</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>junit-jupiter-api</artifactId>
-          <groupId>org.junit.jupiter</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>junit-jupiter-params</artifactId>
-          <groupId>org.junit.jupiter</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>junit-jupiter-engine</artifactId>
-          <groupId>org.junit.jupiter</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
-      <version>3.27.3</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>byte-buddy</artifactId>
-          <groupId>net.bytebuddy</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-  </dependencies>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -277,11 +211,6 @@
         <version>${oracle.jdbc.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.h2database</groupId>
-        <artifactId>h2</artifactId>
-        <version>${h2.version}</version>
-      </dependency>
-      <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
         <version>${picocli.version}</version>
@@ -301,38 +230,23 @@
         <artifactId>versions-maven-plugin</artifactId>
         <version>${versions.plugin.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.assertj</groupId>
-        <artifactId>assertj-core</artifactId>
-        <version>${assertj.version}</version>
-        <scope>test</scope>
-      </dependency>
     </dependencies>
   </dependencyManagement>
   <properties>
-    <shade.plugin.version>3.6.0</shade.plugin.version>
-    <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
-    <jackson.version>2.19.2</jackson.version>
-    <httpclient.version>4.5.14</httpclient.version>
-    <picocli.version>4.7.7</picocli.version>
-    <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <assertj.version>3.27.3</assertj.version>
-    <log4j2.version>2.25.1</log4j2.version>
-    <maven.compiler.source>8</maven.compiler.source>
-    <versions.plugin.version>2.18.0</versions.plugin.version>
-    <h2.version>2.1.214</h2.version>
-    <junit.jupiter.version>5.13.4</junit.jupiter.version>
-    <exec.plugin.version>3.5.1</exec.plugin.version>
-    <maven.compiler.target>8</maven.compiler.target>
-    <assembly.plugin.version>3.7.1</assembly.plugin.version>
     <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+    <assembly.plugin.version>3.7.1</assembly.plugin.version>
+    <httpclient.version>4.5.14</httpclient.version>
     <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
+    <shade.plugin.version>3.6.0</shade.plugin.version>
+    <maven.compiler.target>8</maven.compiler.target>
+    <exec.plugin.version>3.5.1</exec.plugin.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <versions.plugin.version>2.18.0</versions.plugin.version>
+    <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
+    <jackson.version>2.19.2</jackson.version>
+    <picocli.version>4.7.7</picocli.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <log4j2.version>2.25.1</log4j2.version>
+    <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
   </properties>
 </project>

@@ -3,10 +3,28 @@
 set -euo pipefail
 
 # =============================================================================
-# T2T Process Automation Script (Enhanced)
+# Usage:
+#   ./t2t_process.sh [options]
 #
-# Combines interactive/manual T2T process with robust validation, logging, and
-# error handling from t2t_test_runner.sh. Production-ready for both devs and CI.
+# Options:
+#   -i                    Run in interactive mode (prompts for JDK, mode, code)
+#   --build-and-t2t       Build the app and run the T2T process (default)
+#   --t2t-only            Only run the T2T process, skip build
+#   --branch <url>        Clone the specified git branch before running
+#   --mode <mode>         T2T mode: t2t_regular or t2t_full (default: t2t_regular)
+#   --jdk <8|21>          JDK version to use (default: 8)
+#   --proj_dir <DIR>      Project directory (default: current dir)
+#   --app <APP>           App name (default: inferred from project)
+#   --insght_typ_code <C> Insight type code (required)
+#   --logging <0|1>       Enable extra logging (default: 0)
+#   -h, --help            Show this help message
+#
+# Environment Variables:
+#   JDK, PROJ_DIR, APP, INSGHT_TYP_CODE (can be set or prompted)
+#
+# Example:
+#   ./t2t_process.sh --jdk 21 --mode t2t_full --insght_typ_code 136
+#   ./t2t_process.sh -i
 # =============================================================================
 
 # Colors for console output
