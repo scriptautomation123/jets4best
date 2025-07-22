@@ -11,15 +11,21 @@
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <log4j2.version>2.25.0</log4j2.version>
-        <jackson.version>2.15.3</jackson.version>
+        <log4j2.version>2.25.1</log4j2.version>
+        <jackson.version>2.19.2</jackson.version>
         <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
-        <h2.version>2.2.224</h2.version>
+        <h2.version>2.3.232</h2.version>
         <shade.plugin.version>3.6.0</shade.plugin.version>
         <exec.plugin.version>3.5.1</exec.plugin.version>
         <assembly.plugin.version>3.7.1</assembly.plugin.version>
-        <picocli.version>4.7.1</picocli.version>
+        <picocli.version>4.7.7</picocli.version>
         <httpclient.version>4.5.14</httpclient.version>
+        <junit.jupiter.version>5.13.4</junit.jupiter.version>
+        <assertj.version>3.27.3</assertj.version>
+        <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
+        <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
+        <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+        <versions.plugin.version>2.18.0</versions.plugin.version>
     </properties>
 
     <!-- Centralized dependency versions -->
@@ -84,18 +90,18 @@
             <dependency>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
-                <version>2.18.0</version>
+                <version>${versions.plugin.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter</artifactId>
-                <version>5.10.2</version>
+                <version>${junit.jupiter.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
-                <version>3.25.3</version>
+                <version>${assertj.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
@@ -135,16 +141,32 @@
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpcore</artifactId>
         </dependency>
+        <!--
+          Oracle JDBC driver is required at runtime for DriverManager.getConnection("jdbc:oracle:thin:...").
+          It is loaded via the JDBC SPI (META-INF/services/java.sql.Driver) and may appear unused to static
+        analysis tools.
+          Do NOT remove this dependency even if flagged as unused.
+        -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc8</artifactId>
+            <scope>runtime</scope>
         </dependency>
+        <!--
+          H2 database is used for testing and may appear unused if tests are not run or are detected only via
+        reflection.
+          Do NOT remove if you run tests that use H2.
+        -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Test dependencies for unit testing -->
+        <!--
+          JUnit Jupiter is used for unit testing and may appear unused if tests are not run or are detected
+        only via test runners.
+          Do NOT remove if you run tests that use JUnit Jupiter.
+        -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -164,7 +186,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.14.0</version>
+                    <version>${maven.compiler.plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -184,11 +206,31 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
-                    <version>2.18.0</version>
+                    <version>${versions.plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven.enforcer.plugin.version}</version> <!-- Use a recent version -->
+                <executions>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>3.6.3</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -200,7 +242,21 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-            <!-- 1. Shade Plugin: Builds Uberjar -->
+            <!-- Enable JUnit 5 platform for tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
+
+            <!-- 
+                shade plugin, jlink helper class and assembly plugin usage
+                combine to create a fully dependnecy free uber jar with an included jre
+                1. Shade Plugin: Builds Uberjar 
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -242,7 +298,7 @@
                 </executions>
             </plugin>
 
-            <!-- 3. use jdeps and jlink to generate a custom jre-->
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -263,69 +319,38 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Enable JUnit 5 platform for tests -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
-                <configuration>
-                    <useModulePath>false</useModulePath>
-                </configuration>
-            </plugin>
+
         </plugins>
     </build>
 
 
     <profiles>
-        <!-- Checks and validates all versions to make sure we're up to date-->
-        <profile>
-            <id>manage-versions</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>versions-maven-plugin</artifactId>
-                        <executions>
-                            <!-- Display available updates -->
-                            <execution>
-                                <id>display-updates</id>
-                                <goals>
-                                    <goal>display-dependency-updates</goal>
-                                    <goal>display-plugin-updates</goal>
-                                    <goal>display-property-updates</goal>
-                                </goals>
-                            </execution>
-                            <!-- Update dependency properties -->
-                            <execution>
-                                <id>update-dependency-properties</id>
-                                <goals>
-                                    <goal>update-properties</goal>
-                                </goals>
-                                <configuration>
-                                    <autoLinkItems>true</autoLinkItems>
-                                    <includeProperties>.*\.version</includeProperties>
-                                    <allowMajorUpdates>false</allowMajorUpdates>
-                                    <allowMinorUpdates>true</allowMinorUpdates>
-                                    <allowIncrementalUpdates>true</allowIncrementalUpdates>
-                                    <allowSnapshots>false</allowSnapshots>
-                                </configuration>
-                            </execution>
-                            <!-- Post-update check for available updates -->
-                            <execution>
-                                <id>display-updates-post</id>
-                                <goals>
-                                    <goal>display-dependency-updates</goal>
-                                    <goal>display-plugin-updates</goal>
-                                    <goal>display-property-updates</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
+        <!--
+      java21 profile:
+      This profile enables Java 21 compilation and packaging for the CLI application. It sets the
+    compiler source, target, and release to 21.
 
+      The build section configures a special execution stage using the exec-maven-plugin to run a helper
+    class (JlinkHelper) after the uberjar (shaded jar) is built.
 
+      The correct order of build stages is critical:
+      1. **Uberjar (maven-shade-plugin):** First, the application and all dependencies are packaged into
+    a single, self-contained jar. This ensures that jdeps and jlink analyze the actual runtime
+    classpath, including all third-party libraries.
+      2. **jdeps/jlink (via exec-maven-plugin):** Next, the JlinkHelper runs jdeps to analyze the shaded
+    jar and then invokes jlink to generate a minimized custom JRE containing only the modules
+    required by the application. This step must run after the uberjar is created, or the analysis
+    will be incomplete and the resulting JRE may be missing required modules.
+      3. **Assembly (maven-assembly-plugin):** Finally, the assembly plugin can bundle the shaded jar and
+    the custom JRE into a distributable archive. This must run after both the uberjar and jlink
+    steps to ensure the final package is complete and runnable on any compatible system.
+
+      This order guarantees that:
+      - The custom JRE contains exactly the modules needed for the actual, dependency-included
+    application.
+      - The distributable bundle is portable and does not require a pre-installed JDK/JRE.
+      - The build is reproducible and minimal, reducing attack surface and footprint.
+    -->
         <profile>
             <id>java21</id>
             <activation>
@@ -339,15 +364,86 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <release>21</release>
-                        </configuration>
+                        <!-- 3. use jdeps and jlink to generate a custom jre-->
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>${exec.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>run-jlink-helper</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>com.baml.mav.aieutil.buildhelpers.JlinkHelper</mainClass>
+                                    <arguments>
+                                        <argument>
+                                            ${project.build.directory}/${project.build.finalName}.jar</argument>
+                                        <argument>${env.JAVA_HOME}/jmods</argument>
+                                        <argument>${project.build.directory}/jre</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
         </profile>
+
+        <!--
+      update-release-deps profile:
+      1. mvn -Pupdate-release-deps versions:display-dependency-updates
+        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
+         # Shows only stable release updates
+      2. mvn -Pupdate-release-deps versions:update-properties
+        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
+         # Updates properties to latest stable releases
+      3. mvn -Pupdate-release-deps versions:display-dependency-updates
+        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
+         # Confirms all are up to date
+    -->
+        <profile>
+            <id>update-release-deps</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>versions-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>display-release-updates-pre</id>
+                                <goals>
+                                    <goal>display-dependency-updates</goal>
+                                </goals>
+                                <configuration>
+                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>update-release-properties</id>
+                                <goals>
+                                    <goal>update-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>display-release-updates-post</id>
+                                <goals>
+                                    <goal>display-dependency-updates</goal>
+                                </goals>
+                                <configuration>
+                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
     </profiles>
 
 </project>
