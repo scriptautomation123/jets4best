@@ -19,6 +19,7 @@ class ProcedureExecutorTest {
 
     @BeforeAll
     static void setupDb() throws Exception {
+        Class.forName("org.h2.Driver"); // <-- Add this line
         conn = DriverManager.getConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1");
         executor = new ProcedureExecutor();
         try (Statement st = conn.createStatement()) {
