@@ -27,6 +27,19 @@ set -euo pipefail
 #   ./t2t_process.sh -i
 # =============================================================================
 
+# Add default values at the beginning of the script, after the color definitions
+# Default values
+JDK="${JDK:-8}"
+MODE="${MODE:-t2t_regular}"
+PROJ_DIR="${PROJ_DIR:-$(pwd)}"
+APP="${APP:-}"
+INSGHT_TYP_CODE="${INSGHT_TYP_CODE:-}"
+BRANCH_URL="${BRANCH_URL:-}"
+BUILD_AND_T2T="${BUILD_AND_T2T:-1}"
+T2T_ONLY="${T2T_ONLY:-0}"
+INTERACTIVE="${INTERACTIVE:-0}"
+LOGGING="${LOGGING:-0}"
+
 # Colors for console output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -78,6 +91,7 @@ usage() {
     echo "Defaults: --build-and-t2t, jdk=8, mode=t2t_regular, logging=0"
     exit 1
 }
+
 
 prompt_interactive() {
     # Prompt for JDK
