@@ -49,14 +49,32 @@ public class ExecProcedureCmd extends BaseDatabaseCliCommand {
 
 ---
 
-## 2. Command Pattern
-- Each CLI command is a class annotated with `@Command` and implements `Callable<Integer>`.
-- Encapsulates a CLI action as an object, allowing Picocli to treat all commands uniformly.
+## Command Pattern & Picocli Usage
+
+Each CLI command is a class annotated with `@Command` and implements `Callable<Integer>`, encapsulating CLI actions as objects. Example:
+
+```java
+@Command(name = "exec-proc", ...)
+public class ExecProcedureCmd extends BaseDatabaseCliCommand {
+    @Override
+    public Integer call() {
+        try {
+            final ProcedureRequest request = buildProcedureRequest();
+            final ExecutionResult result = service.execute(request);
+            result.formatOutput(System.out);
+            return result.getExitCode();
+        } catch (Exception e) {
+            return ExceptionUtils.handleCliException(e, "execute procedure", System.err);
+        }
+    }
+}
+```
 
 ---
 
-## 3. Builder Pattern
-- Both `DatabaseRequest` and `ProcedureRequest` use the **Builder Pattern** for safe, fluent, and immutable construction.
+## Builder Pattern
+
+Request objects use the builder pattern for safe, fluent, and immutable construction:
 
 ```java
 ProcedureRequest request = ProcedureRequest.builder()
@@ -72,9 +90,9 @@ ProcedureRequest request = ProcedureRequest.builder()
 
 ---
 
-## 4. Template Method Pattern
-- `AbstractDatabaseExecutionService` is an **abstract base class** for all database execution services.
-- Implements the **Template Method Pattern**: the `execute()` method handles password resolution and connection management, then delegates to an abstract `executeWithConnection()`.
+## Template Method Pattern
+
+Abstract services use the template method pattern:
 
 ```java
 public abstract class AbstractDatabaseExecutionService {
@@ -90,9 +108,9 @@ public abstract class AbstractDatabaseExecutionService {
 
 ---
 
-## 5. Factory Method Pattern
-- `createService()` is a **static factory method** that encapsulates the logic for constructing a fully configured `DatabaseService`.
-- This separates the construction logic from the command’s main logic, adhering to the **Single Responsibility Principle**.
+## Factory Method Pattern
+
+Static factory methods encapsulate construction logic:
 
 ```java
 private static DatabaseService createService() {
@@ -104,10 +122,9 @@ private static DatabaseService createService() {
 
 ---
 
-## 6. Dependency Injection (Manual)
-- Instead of hardcoding dependencies, the service is **injected** via the constructor.
-- This is a form of **constructor injection**, a core principle of dependency injection (DI).
-- It makes the code more modular, testable, and flexible.
+## Dependency Injection
+
+Manual constructor injection is used for all core services:
 
 ```java
 public ExecProcedureCmd() {
@@ -117,9 +134,9 @@ public ExecProcedureCmd() {
 
 ---
 
-## 7. Strategy and Factory Patterns for Connection Strings
-- `ConnectionStringGenerator` uses the **Strategy Pattern** to build different types of JDBC URLs (H2, Oracle, LDAP).
-- It acts as a **factory** for connection info objects.
+## Strategy Pattern for Connection Strings
+
+Different strategies are used to build JDBC URLs:
 
 ```java
 public static ConnInfo createConnectionString(String type, String database, String user, String password, String host) {
@@ -128,6 +145,102 @@ public static ConnInfo createConnectionString(String type, String database, Stri
     else if (host != null) { strategy = new OracleJdbc(host, database); }
     else { strategy = new OracleLdap(database); }
     return new ConnInfo(strategy.buildUrl(), user, password);
+}
+```
+
+---
+
+## Structured Logging
+
+All errors and important events are logged using structured logging:
+
+```java
+LoggingUtils.logStructuredError(
+    "procedure_execution",
+    "execute",
+    "FAILED",
+    "Failed to execute procedure with string parameters: " + procFullName,
+    e);
+```
+
+---
+
+## Centralized Exception Handling
+
+Exception handling is centralized via utility methods:
+
+```java
+public static void logAndRethrow(final Exception exception, final String operation) {
+    LoggingUtils.logStructuredError("exception", operation, null, exception.getMessage(), exception);
+    throw new ConfigurationException("Failed to " + operation + ": " + exception.getMessage(), exception);
+}
+```
+
+---
+
+## Vault Integration
+
+VaultClient is used to securely fetch secrets at runtime:
+
+```java
+public VaultClient() {
+    final PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setMaxTotal(MAX_TOTAL_CONNECTIONS);
+    connectionManager.setDefaultMaxPerRoute(DEFAULT_MAX_PER_ROUTE);
+
+    final RequestConfig requestConfig = RequestConfig.custom()
+        .setConnectTimeout(CONNECTION_TIMEOUT_MS)
+        .setSocketTimeout(SOCKET_TIMEOUT_MS)
+        .setConnectionRequestTimeout(CONNECTION_REQUEST_TIMEOUT_MS)
+        .build();
+
+    this.client = HttpClients.custom()
+        .setConnectionManager(connectionManager)
+        .setDefaultRequestConfig(requestConfig)
+        .build();
+
+    LoggingUtils.logStructuredError(
+        VAULT_CLIENT,
+        "init",
+        SUCCESS,
+        "VaultClient initialized with connection pooling and timeouts",
+        null);
+}
+```
+
+---
+
+## Procedure Parameter Parsing (Immutability, Builder, Utility)
+
+Parsing and validating procedure parameters:
+
+```java
+public static ProcedureParam fromString(final String input) {
+    final String[] parts = input.split(":");
+    if (parts.length != EXPECTED_PARAM_PARTS) {
+        LoggingUtils.logStructuredError(
+            PARAMETER_PARSING,
+            "from_string",
+            "INVALID_FORMAT",
+            "Invalid parameter format. Expected 'name:type:value', got: " + input,
+            null);
+        throw new IllegalArgumentException(
+            "Invalid parameter format. Expected 'name:type:value', got: " + input);
+    }
+    return new ProcedureParam(parts[0], parts[1], parts[2]);
+}
+```
+
+---
+
+## SQL Execution Result Object (Immutability, Factory)
+
+Immutable result objects for SQL execution:
+
+```java
+public static SqlResult ofResultSet(
+    final List<Map<String, Object>> rows, final ResultSetMetaData metaData) {
+  return new SqlResult(rows, metaData, -1, true);
 }
 ```
 
@@ -233,10 +346,10 @@ ExecProcedureCmd()
   |         |         |
   |         |         |---> PasswordResolver uses lambda for password prompt
   |         |         |---> DatabaseService ready to use
+  |         |         |
+  |         |         |---> returns DatabaseService
   |         |
-  |         |---> returns DatabaseService
-  |
-  |---> super(DatabaseService)
+  |         |---> super(DatabaseService)
             |
             |---> BaseDatabaseCliCommand stores service for use
 ```
