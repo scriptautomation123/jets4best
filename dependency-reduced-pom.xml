@@ -100,6 +100,37 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-maven-plugin</artifactId>
+        <version>${kotlin.version}</version>
+        <executions>
+          <execution>
+            <id>compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <sourceDirs>
+                <sourceDir>src/main/kotlin</sourceDir>
+              </sourceDirs>
+            </configuration>
+          </execution>
+          <execution>
+            <id>test-compile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>test-compile</goal>
+            </goals>
+            <configuration>
+              <testSourceDirs>
+                <testSourceDir>src/test/kotlin</testSourceDir>
+              </testSourceDirs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>
@@ -133,8 +164,8 @@
       </build>
       <properties>
         <maven.compiler.release>21</maven.compiler.release>
-        <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
       </properties>
     </profile>
     <profile>
@@ -230,23 +261,29 @@
         <artifactId>versions-maven-plugin</artifactId>
         <version>${versions.plugin.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib</artifactId>
+        <version>${kotlin.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <properties>
-    <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
-    <assembly.plugin.version>3.7.1</assembly.plugin.version>
-    <httpclient.version>4.5.14</httpclient.version>
-    <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
+    <kotlin.version>1.9.24</kotlin.version>
     <shade.plugin.version>3.6.0</shade.plugin.version>
-    <maven.compiler.target>8</maven.compiler.target>
-    <exec.plugin.version>3.5.1</exec.plugin.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <versions.plugin.version>2.18.0</versions.plugin.version>
-    <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
-    <jackson.version>2.19.2</jackson.version>
-    <picocli.version>4.7.7</picocli.version>
-    <maven.compiler.source>8</maven.compiler.source>
-    <log4j2.version>2.25.1</log4j2.version>
     <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
+    <jackson.version>2.19.2</jackson.version>
+    <httpclient.version>4.5.14</httpclient.version>
+    <picocli.version>4.7.7</picocli.version>
+    <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <log4j2.version>2.25.1</log4j2.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <versions.plugin.version>2.18.0</versions.plugin.version>
+    <exec.plugin.version>3.5.1</exec.plugin.version>
+    <maven.compiler.target>8</maven.compiler.target>
+    <assembly.plugin.version>3.7.1</assembly.plugin.version>
+    <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+    <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
   </properties>
 </project>
