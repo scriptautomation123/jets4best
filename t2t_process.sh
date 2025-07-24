@@ -133,7 +133,12 @@ clone_branch() {
     log "Cloned $url to $PROJ_DIR"
 }
 
-load_jdk() {
+
+
+set_jdk() {
+    cd "$PROJ_DIR" || error_exit "Cannot cd to $PROJ_DIR"
+    . /efs/env/prod/common/etc/init.functions
+    . /efs/env/prod/common/etc/init.environ
     if [[ "$JDK" == "8" ]]; then
         module load 1.8.0.u351 || error_exit "Failed to load JDK 8"
     elif [[ "$JDK" == "21" ]]; then
@@ -141,16 +146,29 @@ load_jdk() {
     else
         error_exit "Invalid JDK version: $JDK"
     fi
-    log "Loaded JDK $JDK"
+    java -version 
+    if [[ $? -ne 0 ]];then
+        error_exit "Invalid JDK version: $JDK"
+    fi
 }
 
-build_app() {
-    cd "$PROJ_DIR" || error_exit "Cannot cd to $PROJ_DIR"
-    source /efs/env/prod/common/etc/init.functions || error_exit "init.functions missing"
-    source /efs/env/prod/common/etc/init.environ || error_exit "init.environ missing"
-    export PATH=/opt/oracle/jdk/21.0.7/bin:$PATH
-    log "Building app with Maven"
-    mvn clean package -Pjdk21 -q || error_exit "Maven build failed"
+set_maven(){
+    export PATH=/efs/dist/horizon/maven/3.9.3/common/bin/:${PATH}
+    if [[ $? -ne 0 ]];then
+        error_exit "Invalid mvn version:"
+    fi
+}
+
+build_app{
+    set_jdk
+    load_maven
+    if [[ "$JDK" == "8" ]]; then
+        mvn clean package || error_exit "Maven build failed"
+    elif [[ "$JDK" == "21" ]]; then
+        mvn clean package -Pjava21 || error_exit "Maven build failed"
+    else
+        error_exit "Invalid JDK version: $JDK"
+    fi
     cd "$PROJ_DIR/target" || error_exit "Cannot cd to target"
     unzip -q "${APP}.zip" || error_exit "Unzip failed"
     log "Build and unzip complete"
