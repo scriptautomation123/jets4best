@@ -92,6 +92,22 @@ usage() {
     exit 1
 }
 
+set_jdk() {
+    # cd "$PROJ_DIR" || error_exit "Cannot cd to $PROJ_DIR"
+    . /efs/env/prod/common/etc/init.functions
+    . /efs/env/prod/common/etc/init.environ
+    if [[ "$JDK" == "8" ]]; then
+        module load 1.8.0.u351
+    elif [[ "$JDK" == "21" ]]; then
+        module load jdk21
+    else
+        error_exit "Invalid JDK version: $JDK"
+    fi
+    java -version 
+    if [[ $? -ne 0 ]];then
+        error_exit "Invalid JDK version: $JDK"
+    fi
+}
 
 prompt_interactive() {
     # Prompt for JDK
@@ -100,6 +116,7 @@ prompt_interactive() {
         input="${input:-$JDK}"
         if [[ "$input" == "8" || "$input" == "21" ]]; then
             JDK="$input"
+            set_jdk
             break
         else
             echo "Please enter 8 or 21."
@@ -122,6 +139,8 @@ prompt_interactive() {
         INSGHT_TYP_CODE="$input"
     fi
 }
+
+
 
 prompt_interctive
 
