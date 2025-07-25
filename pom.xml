@@ -14,14 +14,13 @@
         <log4j2.version>2.25.1</log4j2.version>
         <jackson.version>2.19.2</jackson.version>
         <oracle.jdbc.version>23.8.0.25.04</oracle.jdbc.version>
-        <!-- <h2.version>2.1.214</h2.version> -->
+
         <shade.plugin.version>3.6.0</shade.plugin.version>
         <exec.plugin.version>3.5.1</exec.plugin.version>
         <assembly.plugin.version>3.7.1</assembly.plugin.version>
         <picocli.version>4.7.7</picocli.version>
         <httpclient.version>4.5.14</httpclient.version>
-        <!-- <junit.jupiter.version>5.13.4</junit.jupiter.version>
-        <assertj.version>3.27.3</assertj.version> -->
+
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
         <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
         <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
