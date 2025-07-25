@@ -1,21 +1,17 @@
 package com.baml.mav.aieutil.util;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,18 +73,6 @@ public final class VaultClient implements AutoCloseable {
   /** Vault token header name */
   private static final String VAULT_TOKEN_HEADER = "x-vault-token";
 
-  /** UTF-8 encoding */
-  private static final String UTF_8_ENCODING = "UTF-8";
-
-  /** Maximum total connections for connection pool */
-  private static final int MAX_TOTAL_CONNECTIONS = 20;
-
-  /** Default maximum connections per route */
-  private static final int DEFAULT_MAX_PER_ROUTE = 10;
-
-  /** Connection timeout in milliseconds */
-  private static final int CONNECTION_TIMEOUT_MS = 2000;
-
   /** Socket timeout in milliseconds */
   private static final int SOCKET_TIMEOUT_MS = 2000;
 
@@ -98,35 +82,16 @@ public final class VaultClient implements AutoCloseable {
   /** JSON object mapper for parsing responses */
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  /** HTTP client for making requests */
-  private final CloseableHttpClient client;
-
   /**
-   * Constructs a new VaultClient with connection pooling and timeout
-   * configuration.
-   * Initializes HTTP client with optimized settings for Vault API interactions.
+   * Constructs a new VaultClient.
+   * Initializes client for Vault API interactions.
    */
   public VaultClient() {
-    final PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
-    connectionManager.setMaxTotal(MAX_TOTAL_CONNECTIONS);
-    connectionManager.setDefaultMaxPerRoute(DEFAULT_MAX_PER_ROUTE);
-
-    final RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectTimeout(CONNECTION_TIMEOUT_MS)
-        .setSocketTimeout(SOCKET_TIMEOUT_MS)
-        .setConnectionRequestTimeout(CONNECTION_REQUEST_TIMEOUT_MS)
-        .build();
-
-    this.client = HttpClients.custom()
-        .setConnectionManager(connectionManager)
-        .setDefaultRequestConfig(requestConfig)
-        .build();
-
     LoggingUtils.logStructuredError(
         VAULT_CLIENT,
         "initialize",
         SUCCESS,
-        "VaultClient initialized with connection pooling and 2s timeouts",
+        "VaultClient initialized with HttpURLConnection and 2s timeouts",
         null);
   }
 
@@ -362,7 +327,7 @@ public final class VaultClient implements AutoCloseable {
     LoggingUtils.logVaultAuthentication(authUrl, STARTED);
     final Map<String, String> headers = new ConcurrentHashMap<>();
     headers.put("Content-Type", CONTENT_TYPE_JSON);
-    final String response = httpPost(authUrl, authBody, headers);
+    final String response = httpPost(authUrl, headers, authBody);
 
     final String clientToken = parseJsonField(response, CLIENT_TOKEN_PATH);
     if (clientToken == null || clientToken.isEmpty()) {
@@ -409,30 +374,53 @@ public final class VaultClient implements AutoCloseable {
    * @throws IOException if the request fails
    */
   private String httpGet(final String url, final Map<String, String> headers) throws IOException {
-    final HttpGet request = new HttpGet(url);
+    final URL urlObj = new URL(url);
+    final HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
+    connection.setRequestMethod("GET");
+    connection.setConnectTimeout(CONNECTION_REQUEST_TIMEOUT_MS);
+    connection.setReadTimeout(SOCKET_TIMEOUT_MS);
 
     for (final Map.Entry<String, String> header : headers.entrySet()) {
-      request.addHeader(header.getKey(), header.getValue());
+      connection.setRequestProperty(header.getKey(), header.getValue());
     }
 
-    try (CloseableHttpResponse response = client.execute(request)) {
-      final int statusCode = response.getStatusLine().getStatusCode();
+    final int statusCode = connection.getResponseCode();
 
-      if (statusCode >= HTTP_CLIENT_ERROR) {
-        final String responseBody = EntityUtils.toString(response.getEntity());
-        final String detailedError = parseVaultError(responseBody, statusCode);
-        final String errorMessage = "Vault HTTP GET failed: " + statusCode + ERROR_SEPARATOR + detailedError;
+    if (statusCode >= HTTP_CLIENT_ERROR) {
+      final String responseBody = readResponseBody(connection);
+      final String detailedError = parseVaultError(responseBody, statusCode);
+      final String errorMessage = "Vault HTTP GET failed: " + statusCode + ERROR_SEPARATOR + detailedError;
 
-        LoggingUtils.logStructuredError(
-            VAULT_CLIENT,
-            "http_get",
-            FAILED,
-            errorMessage,
-            null);
-        throw new ExceptionUtils.ConfigurationException(errorMessage);
+      LoggingUtils.logStructuredError(
+          VAULT_CLIENT,
+          "http_get",
+          FAILED,
+          errorMessage,
+          null);
+      throw new ExceptionUtils.ConfigurationException(errorMessage);
+    }
+
+    return readResponseBody(connection);
+  }
+
+  /**
+   * Helper method to read response body from HttpURLConnection.
+   * 
+   * @param connection the HTTP connection
+   * @return the response body as string
+   * @throws IOException if reading fails
+   */
+  private String readResponseBody(final HttpURLConnection connection) throws IOException {
+    final InputStream inputStream = connection.getErrorStream() != null ? connection.getErrorStream()
+        : connection.getInputStream();
+
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+      final StringBuilder response = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        response.append(line);
       }
-
-      return EntityUtils.toString(response.getEntity());
+      return response.toString();
     }
   }
 
@@ -473,39 +461,47 @@ public final class VaultClient implements AutoCloseable {
    * Performs HTTP POST request to the specified URL.
    * 
    * @param url     the URL to request
-   * @param body    the request body
    * @param headers the headers to include
+   * @param body    the request body
    * @return the response body
    * @throws IOException if the request fails
    */
-  private String httpPost(final String url, final String body, final Map<String, String> headers) throws IOException {
-    final HttpPost request = new HttpPost(url);
+  private String httpPost(final String url, final Map<String, String> headers, final String body) throws IOException {
+    final URL urlObj = new URL(url);
+    final HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
+    connection.setRequestMethod("POST");
+    connection.setConnectTimeout(CONNECTION_REQUEST_TIMEOUT_MS);
+    connection.setReadTimeout(SOCKET_TIMEOUT_MS);
+    connection.setDoOutput(true);
 
     for (final Map.Entry<String, String> header : headers.entrySet()) {
-      request.addHeader(header.getKey(), header.getValue());
+      connection.setRequestProperty(header.getKey(), header.getValue());
     }
 
-    request.setEntity(new StringEntity(body, UTF_8_ENCODING));
-
-    try (CloseableHttpResponse response = client.execute(request)) {
-      final int statusCode = response.getStatusLine().getStatusCode();
-
-      if (statusCode >= HTTP_CLIENT_ERROR) {
-        final String responseBody = EntityUtils.toString(response.getEntity());
-        final String detailedError = parseVaultError(responseBody, statusCode);
-        final String errorMessage = "Vault HTTP POST failed: " + statusCode + ERROR_SEPARATOR + detailedError;
-
-        LoggingUtils.logStructuredError(
-            VAULT_CLIENT,
-            "http_post",
-            FAILED,
-            errorMessage,
-            null);
-        throw new ExceptionUtils.ConfigurationException(errorMessage);
+    if (body != null) {
+      try (OutputStream outputStream = connection.getOutputStream()) {
+        outputStream.write(body.getBytes("UTF-8"));
+        outputStream.flush();
       }
-
-      return EntityUtils.toString(response.getEntity());
     }
+
+    final int statusCode = connection.getResponseCode();
+
+    if (statusCode >= HTTP_CLIENT_ERROR) {
+      final String responseBody = readResponseBody(connection);
+      final String detailedError = parseVaultError(responseBody, statusCode);
+      final String errorMessage = "Vault HTTP POST failed: " + statusCode + ERROR_SEPARATOR + detailedError;
+
+      LoggingUtils.logStructuredError(
+          VAULT_CLIENT,
+          "http_post",
+          FAILED,
+          errorMessage,
+          null);
+      throw new ExceptionUtils.ConfigurationException(errorMessage);
+    }
+
+    return readResponseBody(connection);
   }
 
   /**
@@ -560,18 +556,9 @@ public final class VaultClient implements AutoCloseable {
 
   @Override
   public void close() throws IOException {
-    if (client != null) {
-      LoggingUtils.logStructuredError(
-          VAULT_CLIENT, CLOSE_OPERATION, STARTED, "Closing VaultClient HTTP client", null);
-      try {
-        client.close();
-        LoggingUtils.logStructuredError(
-            VAULT_CLIENT, CLOSE_OPERATION, SUCCESS, "VaultClient HTTP client closed successfully", null);
-      } catch (IOException exception) {
-        LoggingUtils.logStructuredError(
-            VAULT_CLIENT, CLOSE_OPERATION, FAILED, "Error closing HTTP client: " + exception.getMessage(), exception);
-        throw exception;
-      }
-    }
+    LoggingUtils.logStructuredError(
+        VAULT_CLIENT, CLOSE_OPERATION, STARTED, "Closing VaultClient HTTP client", null);
+    LoggingUtils.logStructuredError(
+        VAULT_CLIENT, CLOSE_OPERATION, SUCCESS, "VaultClient HTTP client closed successfully", null);
   }
 }

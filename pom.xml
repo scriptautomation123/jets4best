@@ -19,7 +19,7 @@
         <exec.plugin.version>3.5.1</exec.plugin.version>
         <assembly.plugin.version>3.7.1</assembly.plugin.version>
         <picocli.version>4.7.7</picocli.version>
-        <httpclient.version>4.5.14</httpclient.version>
+        <httpclient.version>5.5</httpclient.version>
 
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
         <maven.enforcer.plugin.version>3.6.1</maven.enforcer.plugin.version>
@@ -70,16 +70,19 @@
                 <version>${picocli.version}</version>
             </dependency>
             <!-- Apache HttpClient -->
+
+            <!-- https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5 -->
             <dependency>
-                <groupId>org.apache.httpcomponents</groupId>
-                <artifactId>httpclient</artifactId>
-                <version>${httpclient.version}</version>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>5.5</version>
             </dependency>
-            <dependency>
+
+            <!-- <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpcore</artifactId>
                 <version>4.4.16</version>
-            </dependency>
+            </dependency> -->
             <dependency>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
@@ -114,13 +117,10 @@
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5 -->
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
         </dependency>
         <!--
           Oracle JDBC driver is required at runtime for DriverManager.getConnection("jdbc:oracle:thin:...").
@@ -282,7 +282,7 @@
       - The build is reproducible and minimal, reducing attack surface and footprint.
     -->
         <profile>
-            <id>java21</id>
+            <id>java21jre</id>
             <activation>
                 <activeByDefault>false</activeByDefault>
             </activation>
@@ -319,6 +319,21 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+
+        <!--
+         This is the same as java21jre profile except this doesnt generate a jre (java runtime)
+        -->
+        <profile>
+            <id>java21</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.release>21</maven.compiler.release>
+            </properties>
         </profile>
 
         <!--

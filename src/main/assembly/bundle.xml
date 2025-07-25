@@ -9,6 +9,15 @@
     <baseDirectory>${project.artifactId}-${project.version}</baseDirectory>
 
     <fileSets>
+        <!-- Conditional JRE inclusion - only if jre directory exists -->
+        <fileSet>
+            <directory>${project.build.directory}/jre</directory>
+            <outputDirectory>jre</outputDirectory>
+            <directoryMode>0755</directoryMode>
+            <fileMode>0644</fileMode>
+            <!-- This makes the fileSet optional - Maven will skip if directory doesn't exist -->
+            <useDefaultExcludes>true</useDefaultExcludes>
+        </fileSet>
 
         <!-- 2. Copy the shaded JAR (with-dependencies) at the top level -->
         <fileSet>

@@ -1,0 +1,126 @@
+@startuml VaultClient_Architecture_Flow
+
+!define RECTANGLE class
+
+package "CLI Layer" {
+    RECTANGLE ExecProcedureCmd {
+        +call(): Integer
+        +buildProcedureRequest(): ProcedureRequest
+    }
+    
+    RECTANGLE ExecVaultClientCmd {
+        +call(): Integer
+        +buildVaultClientRequest(): VaultClientRequest
+    }
+}
+
+package "Service Layer" {
+    RECTANGLE DatabaseService {
+        +execute(request): ExecutionResult
+        -resolvePassword(request): Optional<String>
+    }
+    
+    RECTANGLE VaultClientService {
+        +execute(request): ExecutionResult
+        -executeLookupMode(request): ExecutionResult
+        -executeDirectMode(request): ExecutionResult
+    }
+}
+
+package "Authentication Layer" {
+    RECTANGLE PasswordResolver {
+        +resolve(request): Optional<String>
+        -fetchPasswordFromVault(client, request): String
+    }
+}
+
+package "Vault Integration Layer" {
+    RECTANGLE VaultClient {
+        +fetchOraclePassword(user, database): String
+        +fetchOraclePassword(vaultBaseUrl, roleId, secretId, dbName, ait, username): String
+        -authenticateToVault(vaultBaseUrl, roleId, secretId): String
+        -httpGet(url, headers): String
+        -httpPost(url, headers, body): String
+        -readResponseBody(connection): String
+        -parseVaultError(responseBody, statusCode): String
+    }
+}
+
+package "Configuration Layer" {
+    RECTANGLE YamlConfig {
+        +getAll(): Map<String, Object>
+        +getRawValue(key): String
+    }
+    
+    RECTANGLE VaultsConfig {
+        +vaults: List<VaultEntry>
+        +base-url: String
+        +role-id: String
+        +secret-id: String
+        +ait: String
+        +db: String
+    }
+}
+
+package "External Systems" {
+    cloud "HashiCorp Vault" as Vault {
+        note as VaultEndpoints
+            /v1/auth/approle/login
+            /v1/secrets/database/oracle/static-creds/{ait}-{db}-{user}
+        end note
+    }
+}
+
+' CLI Layer relationships
+ExecProcedureCmd --> DatabaseService : uses
+ExecVaultClientCmd --> VaultClientService : uses
+
+' Service Layer relationships
+DatabaseService --> PasswordResolver : uses
+VaultClientService --> VaultClient : creates/uses
+
+' Authentication Layer relationships
+PasswordResolver --> VaultClient : creates/uses
+
+' Vault Integration Layer relationships
+VaultClient --> YamlConfig : reads config
+VaultClient --> "HashiCorp Vault" : HTTP requests
+
+' Configuration Layer relationships
+YamlConfig --> VaultsConfig : reads
+
+' Flow annotations
+note right of ExecProcedureCmd
+  User runs: exec-proc MAV_OWNER.MyProc
+  --vault --username MAV_T2T_APP
+end note
+
+note right of DatabaseService
+  1. Resolves password via PasswordResolver
+  2. Creates database connection
+  3. Executes procedure
+end note
+
+note right of PasswordResolver
+  1. Checks if --vault flag is set
+  2. Creates VaultClient instance
+  3. Calls fetchOraclePassword()
+end note
+
+note right of VaultClient
+  1. Reads vaults.yaml config
+  2. Authenticates to Vault (HTTP POST)
+  3. Fetches password (HTTP GET)
+  4. Parses JSON response
+  5. Returns password
+end note
+
+note right of "HashiCorp Vault"
+  Authentication Flow:
+  1. POST /v1/auth/approle/login
+     {"role_id": "...", "secret_id": "..."}
+  2. GET /v1/secrets/database/oracle/static-creds/{ait}-{db}-{user}
+     Headers: x-vault-token: {client_token}
+end note
+
+@enduml
