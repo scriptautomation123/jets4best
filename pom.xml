@@ -136,7 +136,7 @@
 
 
     </dependencies>
-    <!-- Centralized plugin versions -->
+    <!-- build with centralized plugin management -->
     <build>
         <pluginManagement>
             <plugins>
@@ -168,7 +168,6 @@
             </plugins>
         </pluginManagement>
         <plugins>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -180,107 +179,165 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-
-
-            <!-- 
-                shade plugin, jlink helper class and assembly plugin usage
-                combine to create a fully dependnecy free uber jar with an included jre
-                1. Shade Plugin: Builds Uberjar 
-            -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>shade-uberjar</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>META-INF/MANIFEST.MF</exclude>
-                                        <exclude>META-INF/LICENSE*</exclude>
-                                        <exclude>META-INF/NOTICE*</exclude>
-                                        <exclude>META-INF/DEPENDENCIES</exclude>
-                                        <exclude>META-INF/maven/**</exclude>
-                                        <exclude>META-INF/versions/**</exclude>
-                                        <exclude>module-info.class</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <transformers>
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
-                                </transformer>
-                                <transformer
-                                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                            </transformers>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <phase>package</phase>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/bundle.xml</descriptor>
-                            </descriptors>
-                            <finalName>${project.build.finalName}</finalName>
-                            <appendAssemblyId>false</appendAssemblyId>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
         </plugins>
     </build>
 
 
     <profiles>
-        <!--
-      java21 profile:
-      This profile enables Java 21 compilation and packaging for the CLI application. It sets the
-    compiler source, target, and release to 21.
+        <!-- Profile 1: Java 8 (Default) -->
+        <profile>
+            <id>java8</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <maven.compiler.source>8</maven.compiler.source>
+                <maven.compiler.target>8</maven.compiler.target>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>shade-uberjar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/LICENSE*</exclude>
+                                                <exclude>META-INF/NOTICE*</exclude>
+                                                <exclude>META-INF/DEPENDENCIES</exclude>
+                                                <exclude>META-INF/maven/**</exclude>
+                                                <exclude>META-INF/versions/**</exclude>
+                                                <exclude>module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <transformers>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
+                                        </transformer>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>make-assembly</id>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <phase>package</phase>
+                                <configuration>
+                                    <descriptors>
+                                        <descriptor>src/main/assembly/bundle.xml</descriptor>
+                                    </descriptors>
+                                    <finalName>${project.build.finalName}</finalName>
+                                    <appendAssemblyId>false</appendAssemblyId>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
 
-      The build section configures a special execution stage using the exec-maven-plugin to run a helper
-    class (JlinkHelper) after the uberjar (shaded jar) is built.
+        <!-- Profile 2: Java 21 (No JRE) -->
+        <profile>
+            <id>java21</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.release>21</maven.compiler.release>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>shade-uberjar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/LICENSE*</exclude>
+                                                <exclude>META-INF/NOTICE*</exclude>
+                                                <exclude>META-INF/DEPENDENCIES</exclude>
+                                                <exclude>META-INF/maven/**</exclude>
+                                                <exclude>META-INF/versions/**</exclude>
+                                                <exclude>module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <transformers>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
+                                        </transformer>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>make-assembly</id>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <phase>package</phase>
+                                <configuration>
+                                    <descriptors>
+                                        <descriptor>src/main/assembly/bundle.xml</descriptor>
+                                    </descriptors>
+                                    <finalName>${project.build.finalName}</finalName>
+                                    <appendAssemblyId>false</appendAssemblyId>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
 
-      The correct order of build stages is critical:
-      1. **Uberjar (maven-shade-plugin):** First, the application and all dependencies are packaged into
-    a single, self-contained jar. This ensures that jdeps and jlink analyze the actual runtime
-    classpath, including all third-party libraries.
-      2. **jdeps/jlink (via exec-maven-plugin):** Next, the JlinkHelper runs jdeps to analyze the shaded
-    jar and then invokes jlink to generate a minimized custom JRE containing only the modules
-    required by the application. This step must run after the uberjar is created, or the analysis
-    will be incomplete and the resulting JRE may be missing required modules.
-      3. **Assembly (maven-assembly-plugin):** Finally, the assembly plugin can bundle the shaded jar and
-    the custom JRE into a distributable archive. This must run after both the uberjar and jlink
-    steps to ensure the final package is complete and runnable on any compatible system.
-
-      This order guarantees that:
-      - The custom JRE contains exactly the modules needed for the actual, dependency-included
-    application.
-      - The distributable bundle is portable and does not require a pre-installed JDK/JRE.
-      - The build is reproducible and minimal, reducing attack surface and footprint.
-    -->
+        <!-- Profile 3: Java 21 (JRE) -->
         <profile>
             <id>java21jre</id>
             <activation>
@@ -294,7 +351,47 @@
             <build>
                 <plugins>
                     <plugin>
-                        <!-- 3. use jdeps and jlink to generate a custom jre-->
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>shade-uberjar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/LICENSE*</exclude>
+                                                <exclude>META-INF/NOTICE*</exclude>
+                                                <exclude>META-INF/DEPENDENCIES</exclude>
+                                                <exclude>META-INF/maven/**</exclude>
+                                                <exclude>META-INF/versions/**</exclude>
+                                                <exclude>module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <transformers>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
+                                        </transformer>
+                                        <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <!-- 2. use jdeps and jlink to generate a custom jre-->
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
                         <version>${exec.plugin.version}</version>
@@ -317,70 +414,22 @@
                             </execution>
                         </executions>
                     </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!--
-         This is the same as java21jre profile except this doesnt generate a jre (java runtime)
-        -->
-        <profile>
-            <id>java21</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <properties>
-                <maven.compiler.source>21</maven.compiler.source>
-                <maven.compiler.target>21</maven.compiler.target>
-                <maven.compiler.release>21</maven.compiler.release>
-            </properties>
-        </profile>
-
-        <!--
-      update-release-deps profile:
-      1. mvn -Pupdate-release-deps versions:display-dependency-updates
-        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
-         # Shows only stable release updates
-      2. mvn -Pupdate-release-deps versions:update-properties
-        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
-         # Updates properties to latest stable releases
-      3. mvn -Pupdate-release-deps versions:display-dependency-updates
-        -Dmaven.version.ignore='(?i).*-(alpha|beta|beta2|m|rc)(\d+)?'
-         # Confirms all are up to date
-    -->
-        <profile>
-            <id>update-release-deps</id>
-            <build>
-                <plugins>
                     <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>versions-maven-plugin</artifactId>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>display-release-updates-pre</id>
+                                <id>make-assembly</id>
                                 <goals>
-                                    <goal>display-dependency-updates</goal>
+                                    <goal>single</goal>
                                 </goals>
+                                <phase>package</phase>
                                 <configuration>
-                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>update-release-properties</id>
-                                <goals>
-                                    <goal>update-properties</goal>
-                                </goals>
-                                <configuration>
-                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>display-release-updates-post</id>
-                                <goals>
-                                    <goal>display-dependency-updates</goal>
-                                </goals>
-                                <configuration>
-                                    <ignoredVersions>(?i).*-(alpha|beta|beta2|m|rc)(\d+)?</ignoredVersions>
+                                    <descriptors>
+                                        <descriptor>src/main/assembly/bundle.xml</descriptor>
+                                    </descriptors>
+                                    <finalName>${project.build.finalName}</finalName>
+                                    <appendAssemblyId>false</appendAssemblyId>
                                 </configuration>
                             </execution>
                         </executions>
