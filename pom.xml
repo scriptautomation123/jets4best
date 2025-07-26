@@ -78,11 +78,6 @@
                 <version>5.5</version>
             </dependency>
 
-            <!-- <dependency>
-                <groupId>org.apache.httpcomponents</groupId>
-                <artifactId>httpcore</artifactId>
-                <version>4.4.16</version>
-            </dependency> -->
             <dependency>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
@@ -304,7 +299,7 @@
                                     <transformers>
                                         <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
+                                            <mainClass>com.company.app.service.AieUtilMain</mainClass>
                                         </transformer>
                                         <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
@@ -350,6 +345,7 @@
             </properties>
             <build>
                 <plugins>
+
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
@@ -381,7 +377,7 @@
                                     <transformers>
                                         <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <mainClass>com.baml.mav.aieutil.AieUtilMain</mainClass>
+                                            <mainClass>com.company.app.service.AieUtilMain</mainClass>
                                         </transformer>
                                         <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
@@ -390,8 +386,8 @@
                             </execution>
                         </executions>
                     </plugin>
+
                     <plugin>
-                        <!-- 2. use jdeps and jlink to generate a custom jre-->
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
                         <version>${exec.plugin.version}</version>
@@ -403,7 +399,7 @@
                                     <goal>java</goal>
                                 </goals>
                                 <configuration>
-                                    <mainClass>com.baml.mav.aieutil.buildhelpers.JlinkHelper</mainClass>
+                                    <mainClass>com.company.app.service.buildhelpers.JlinkHelper</mainClass>
                                     <arguments>
                                         <argument>
                                             ${project.build.directory}/${project.build.finalName}.jar</argument>
@@ -414,6 +410,7 @@
                             </execution>
                         </executions>
                     </plugin>
+
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>
@@ -434,6 +431,7 @@
                             </execution>
                         </executions>
                     </plugin>
+
                 </plugins>
             </build>
         </profile>

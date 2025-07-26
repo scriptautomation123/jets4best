@@ -6,8 +6,8 @@ databases:
         port: 49125
       ldap:
         template: "ldap://%s:%d/%s,%s"
-        servers: "oid1puser.bankofamerica.com,oid2puser.bankofamerica.com,oid3puser.bankofamerica.com"
-        context: "cn=oracleContext,dc=bankofamerica,dc=com"
+        servers: "oid1puser.someplace.com,oid2puser.someplace.com,oid3puser.someplace.com"
+        context: "cn=oracleContext,dc=somecompany,dc=com"
         port: 389
   h2:
     connection-string:

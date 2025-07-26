@@ -12,13 +12,11 @@
         </File>
     </Appenders>
     <Loggers>
-        <Logger name="com.baml.mav.aieutil" level="DEBUG" additivity="false">
+        <Logger name="com.company.app.service" level="DEBUG" additivity="false">
             <AppenderRef ref="File" />
         </Logger>
-        <Logger name="com.baml.mav.aieutil.validate.VaultClientTest" level="INFO" additivity="false">
-            <AppenderRef ref="File" />
-        </Logger>
-        <Logger name="com.baml.mav.aieutil.util.LoggingUtils" level="ERROR" additivity="false">
+
+        <Logger name="com.company.app.service.util.LoggingUtils" level="ERROR" additivity="false">
             <AppenderRef ref="Console" />
             <AppenderRef ref="File" />
         </Logger>
